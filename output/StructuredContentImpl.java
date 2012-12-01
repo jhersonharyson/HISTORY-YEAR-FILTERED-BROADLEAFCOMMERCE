@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,19 +18,18 @@ package org.broadleafcommerce.cms.structure.domain;
 
 import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.common.locale.domain.LocaleImpl;
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentationClass;
+import org.broadleafcommerce.common.presentation.override.AdminPresentationOverride;
+import org.broadleafcommerce.common.presentation.override.AdminPresentationOverrides;
+import org.broadleafcommerce.common.presentation.PopulateToOneFieldsEnum;
+import org.broadleafcommerce.common.presentation.RequiredOverride;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.sandbox.domain.SandBoxImpl;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
-import org.broadleafcommerce.openadmin.server.domain.SandBoxImpl;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.broadleafcommerce.presentation.AdminPresentationClass;
-import org.broadleafcommerce.presentation.AdminPresentationOverride;
-import org.broadleafcommerce.presentation.AdminPresentationOverrides;
-import org.broadleafcommerce.presentation.PopulateToOneFieldsEnum;
 import org.hibernate.annotations.BatchSize;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.Index;
 
@@ -53,6 +52,7 @@ import javax.persistence.MapKeyColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.TableGenerator;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -64,29 +64,22 @@ import java.util.Set;
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_SC")
-@Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
 @EntityListeners(value = { AdminAuditableListener.class })
 @AdminPresentationOverrides(
         {
-            @AdminPresentationOverride(name="auditable.createdBy.name", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.updatedBy.name", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.dateCreated", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.dateUpdated", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.createdBy.login", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.createdBy.password", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.createdBy.email", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.createdBy.currentSandBox", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.login", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.password", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.email", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.currentSandBox", value=@AdminPresentation(excluded = true)),
+            @AdminPresentationOverride(name="auditable.createdBy.id", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.updatedBy.id", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.createdBy.name", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.updatedBy.name", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.dateCreated", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.dateUpdated", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
             @AdminPresentationOverride(name="locale.id", value=@AdminPresentation(excluded = true)),
             @AdminPresentationOverride(name="locale.localeCode", value=@AdminPresentation(excluded = true)),
             @AdminPresentationOverride(name="locale.friendlyName", value=@AdminPresentation(excluded = true)),
             @AdminPresentationOverride(name="locale.defaultFlag", value=@AdminPresentation(excluded = true))
         }
 )
-@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "baseStructuredContent")
+@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "StructuredContentImpl_baseStructuredContent")
 public class StructuredContentImpl implements StructuredContent {
 
     private static final long serialVersionUID = 1L;
@@ -98,11 +91,12 @@ public class StructuredContentImpl implements StructuredContent {
     protected Long id;
 
     @Embedded
+    @AdminPresentation(excluded = true)
     protected AdminAuditable auditable = new AdminAuditable();
 
-    @AdminPresentation(friendlyName="Content Name", order=1, groupOrder = 1, group="Description", prominent=true)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Content_Name", order=1, groupOrder = 1, group = "StructuredContentImpl_Description", prominent=true)
     @Column(name = "CONTENT_NAME", nullable = false)
-    @Index(name="CONTENT_NAME_INDEX", columnNames={"CONTENT_NAME", "SC_TYPE_ID"})
+    @Index(name="CONTENT_NAME_INDEX", columnNames={"CONTENT_NAME", "ARCHIVED_FLAG", "SC_TYPE_ID"})
     protected String contentName;
 
     @ManyToOne(targetEntity = LocaleImpl.class, optional = false)
@@ -110,32 +104,29 @@ public class StructuredContentImpl implements StructuredContent {
     @AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)
     protected Locale locale;
 
-    @AdminPresentation(friendlyName="Priority", order=3, group="Description")
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Priority", order=3, group = "StructuredContentImpl_Description")
     @Column(name = "PRIORITY", nullable = false)
-    @Index(name="PRIORITY_INDEX", columnNames={"PRIORITY"})
     protected Integer priority;
 
     @ManyToMany(targetEntity = StructuredContentRuleImpl.class, cascade = {CascadeType.ALL})
     @JoinTable(name = "BLC_SC_RULE_MAP", inverseJoinColumns = @JoinColumn(name = "SC_RULE_ID", referencedColumnName = "SC_RULE_ID"))
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
     @MapKeyColumn(name = "MAP_KEY", nullable = false)
-    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
     Map<String, StructuredContentRule> structuredContentMatchRules = new HashMap<String, StructuredContentRule>();
 
     @OneToMany(fetch = FetchType.LAZY, targetEntity = StructuredContentItemCriteriaImpl.class, cascade={CascadeType.ALL})
-    @JoinTable(name = "BLC_QUAL_CRIT_SC_XREF", joinColumns = @JoinColumn(name = "ID"), inverseJoinColumns = @JoinColumn(name = "SC_ITEM_CRITERIA_ID"))
+    @JoinTable(name = "BLC_QUAL_CRIT_SC_XREF", joinColumns = @JoinColumn(name = "SC_ID"), inverseJoinColumns = @JoinColumn(name = "SC_ITEM_CRITERIA_ID"))
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
-    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
     protected Set<StructuredContentItemCriteria> qualifyingItemCriteria = new HashSet<StructuredContentItemCriteria>();
 
-    @AdminPresentation(friendlyName="Original Item Id", order=1, group="Internal", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Original_Item_Id", order=1, group = "StructuredContentImpl_Internal", visibility = VisibilityEnum.HIDDEN_ALL)
     @Column(name = "ORIG_ITEM_ID")
     @Index(name="SC_ORIG_ITEM_ID_INDEX", columnNames={"ORIG_ITEM_ID"})
     protected Long originalItemId;
 
     @ManyToOne (targetEntity = SandBoxImpl.class)
     @JoinColumn(name="SANDBOX_ID")
-    @AdminPresentation(friendlyName="Content SandBox", order=1, group="Stuctured Content", excluded = true)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Content_SandBox", order=1, group = "StructuredContentImpl_Stuctured_Content", excluded = true)
     protected SandBox sandbox;
 
     @ManyToOne(targetEntity = SandBoxImpl.class)
@@ -145,34 +136,33 @@ public class StructuredContentImpl implements StructuredContent {
 
     @ManyToOne(targetEntity = StructuredContentTypeImpl.class)
     @JoinColumn(name="SC_TYPE_ID")
-    @AdminPresentation(friendlyName="Content Type", order=2, group="Description", excluded=true, visibility = VisibilityEnum.GRID_HIDDEN)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Content_Type", order=2, group = "StructuredContentImpl_Description", excluded=true, visibility = VisibilityEnum.GRID_HIDDEN, requiredOverride = RequiredOverride.REQUIRED)
     protected StructuredContentType structuredContentType;
 
     @ManyToMany(targetEntity = StructuredContentFieldImpl.class, cascade = CascadeType.ALL)
     @JoinTable(name = "BLC_SC_FLD_MAP", joinColumns = @JoinColumn(name = "SC_ID", referencedColumnName = "SC_ID"), inverseJoinColumns = @JoinColumn(name = "SC_FLD_ID", referencedColumnName = "SC_FLD_ID"))
     @org.hibernate.annotations.MapKey(columns = {@Column(name = "MAP_KEY", nullable = false)})
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
-    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
     @BatchSize(size = 20)
     protected Map<String,StructuredContentField> structuredContentFields = new HashMap<String,StructuredContentField>();
 
-    @AdminPresentation(friendlyName="Deleted", order=2, group="Internal", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Deleted", order=2, group = "StructuredContentImpl_Internal", visibility = VisibilityEnum.HIDDEN_ALL)
     @Column(name = "DELETED_FLAG")
     @Index(name="SC_DLTD_FLG_INDX", columnNames={"DELETED_FLAG"})
     protected Boolean deletedFlag;
 
-    @AdminPresentation(friendlyName="Archived", order=3, group="Internal", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Archived", order=3, group = "StructuredContentImpl_Internal", visibility = VisibilityEnum.HIDDEN_ALL)
     @Column(name = "ARCHIVED_FLAG")
     @Index(name="SC_ARCHVD_FLG_INDX", columnNames={"ARCHIVED_FLAG"})
     protected Boolean archivedFlag;
 
-    @AdminPresentation(friendlyName="Offline", order=4, group="Description")
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Offline", order=4, group = "StructuredContentImpl_Description")
     @Column(name = "OFFLINE_FLAG")
     @Index(name="SC_OFFLN_FLG_INDX", columnNames={"OFFLINE_FLAG"})
     protected Boolean offlineFlag = false;
 
     @Column (name = "LOCKED_FLAG")
-    @AdminPresentation(friendlyName="Is Locked", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentImpl_Is_Locked", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="SC_LCKD_FLG_INDX", columnNames={"LOCKED_FLAG"})
     protected Boolean lockedFlag = false;
 

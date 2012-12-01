@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,10 @@
 
 package org.broadleafcommerce.cms.file.domain;
 
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
-import org.broadleafcommerce.presentation.AdminPresentation;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -57,11 +58,11 @@ public class StaticAssetDescriptionImpl implements StaticAssetDescription {
     protected AdminAuditable auditable = new AdminAuditable();
 
     @Column (name = "DESCRIPTION")
-    @AdminPresentation(friendlyName="Description")
+    @AdminPresentation(friendlyName = "StaticAssetDescriptionImpl_Description", prominent = true)
     protected String description;
 
     @Column (name = "LONG_DESCRIPTION")
-    @AdminPresentation(friendlyName="Long Description", largeEntry = true)
+    @AdminPresentation(friendlyName = "StaticAssetDescriptionImpl_Long_Description", largeEntry = true, visibility = VisibilityEnum.GRID_HIDDEN)
     protected String longDescription;
 
     @Override

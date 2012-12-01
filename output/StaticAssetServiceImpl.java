@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,35 +16,49 @@
 
 package org.broadleafcommerce.cms.file.service;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.velocity.tools.view.ImportSupport;
+import org.broadleafcommerce.cms.common.AbstractContentService;
 import org.broadleafcommerce.cms.file.dao.StaticAssetDao;
 import org.broadleafcommerce.cms.file.domain.StaticAsset;
-import org.broadleafcommerce.cms.page.domain.Page;
+import org.broadleafcommerce.cms.file.domain.StaticAssetImpl;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.sandbox.domain.SandBoxType;
 import org.broadleafcommerce.openadmin.server.dao.SandBoxItemDao;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
 import org.broadleafcommerce.openadmin.server.domain.SandBoxItem;
 import org.broadleafcommerce.openadmin.server.domain.SandBoxItemType;
 import org.broadleafcommerce.openadmin.server.domain.SandBoxOperationType;
-import org.broadleafcommerce.openadmin.server.domain.SandBoxType;
 import org.hibernate.Criteria;
-import org.hibernate.criterion.Criterion;
-import org.hibernate.criterion.Projections;
-import org.hibernate.criterion.Restrictions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.List;
 
 /**
  * Created by bpolster.
  */
 @Service("blStaticAssetService")
-public class StaticAssetServiceImpl implements StaticAssetService {
+public class StaticAssetServiceImpl extends AbstractContentService implements StaticAssetService {
 
     private static final Log LOG = LogFactory.getLog(StaticAssetServiceImpl.class);
+
+    @Value("${asset.server.url.prefix.internal}")
+    protected String staticAssetUrlPrefix;
+
+    @Value("${asset.server.url.prefix}")
+    protected String staticAssetEnvironmentUrlPrefix;
+
+    @Value("${asset.server.url.prefix.secure}")
+    protected String staticAssetEnvironmentSecureUrlPrefix;
+
+    @Value("${automatically.approve.static.assets}")
+    protected boolean automaticallyApproveAndPromoteStaticAssets=true;
 
     @Resource(name="blStaticAssetDao")
     protected StaticAssetDao staticAssetDao;
@@ -62,17 +76,35 @@ public class StaticAssetServiceImpl implements StaticAssetService {
 
     @Override
     public StaticAsset findStaticAssetByFullUrl(String fullUrl, SandBox targetSandBox) {
+    	try {
+			fullUrl = URLDecoder.decode(fullUrl, "UTF-8");
+			//strip out the jsessionid if it's there
+			fullUrl = fullUrl.replaceAll(";jsessionid=.*?(?=\\?|$)", "");
+		} catch (UnsupportedEncodingException e) {
+			throw new RuntimeException("Unsupported encoding to decode fullUrl", e);
+		}
         return staticAssetDao.readStaticAssetByFullUrl(fullUrl, targetSandBox);
     }
 
     @Override
     public StaticAsset addStaticAsset(StaticAsset staticAsset, SandBox destinationSandbox) {
+        
+        if (automaticallyApproveAndPromoteStaticAssets) {           
+            if (destinationSandbox != null && destinationSandbox.getSite() != null) {
+                destinationSandbox = destinationSandbox.getSite().getProductionSandbox();
+            } else {
+                // Null means production for single-site installations.
+                destinationSandbox = null;
+            }            
+        }
+        
         staticAsset.setSandbox(destinationSandbox);
-        staticAsset.setArchivedFlag(false);
         staticAsset.setDeletedFlag(false);
+        staticAsset.setArchivedFlag(false);
         StaticAsset newAsset = staticAssetDao.addOrUpdateStaticAsset(staticAsset, true);
+        
         if (! isProductionSandBox(destinationSandbox)) {
-            sandBoxItemDao.addSandBoxItem(destinationSandbox, SandBoxOperationType.ADD, SandBoxItemType.STATIC_ASSET, newAsset.getFullUrl(), newAsset.getId(), null);
+            sandBoxItemDao.addSandBoxItem(destinationSandbox.getId(), SandBoxOperationType.ADD, SandBoxItemType.STATIC_ASSET, newAsset.getFullUrl(), newAsset.getId(), null);
         }
         return newAsset;
     }
@@ -82,19 +114,30 @@ public class StaticAssetServiceImpl implements StaticAssetService {
         if (staticAsset.getLockedFlag()) {
             throw new IllegalArgumentException("Unable to update a locked record");
         }
+        
+        if (automaticallyApproveAndPromoteStaticAssets) {           
+            if (destSandbox != null && destSandbox.getSite() != null) {
+                destSandbox = destSandbox.getSite().getProductionSandbox();
+            } else {
+                // Null means production for single-site installations.
+                destSandbox = null;
+            }
+        }
 
         if (checkForSandboxMatch(staticAsset.getSandbox(), destSandbox)) {
             if (staticAsset.getDeletedFlag()) {
-                SandBoxItem item = sandBoxItemDao.retrieveBySandboxAndTemporaryItemId(staticAsset.getSandbox(), SandBoxItemType.STATIC_ASSET, staticAsset.getId());
-                if (staticAsset.getOriginalAssetId() == null) {
-                    // This page was added in this sandbox and now needs to be deleted.
+                SandBoxItem item = sandBoxItemDao.retrieveBySandboxAndTemporaryItemId(staticAsset.getSandbox()==null?null:staticAsset.getSandbox().getId(), SandBoxItemType.STATIC_ASSET, staticAsset.getId());
+                if (staticAsset.getOriginalAssetId() == null && item != null) {
+                    // This item was added in this sandbox and now needs to be deleted.
                     staticAsset.setArchivedFlag(true);
                     item.setArchivedFlag(true);
-                } else {
-                    // This page was being updated but now is being deleted - so change the
+                } else if (item != null) {
+                    // This item was being updated but now is being deleted - so change the
                     // sandbox operation type to deleted
                     item.setSandBoxOperationType(SandBoxOperationType.DELETE);
                     sandBoxItemDao.updateSandBoxItem(item);
+                } else if (automaticallyApproveAndPromoteStaticAssets) {
+                    staticAsset.setArchivedFlag(true);
                 }
             }
             return staticAssetDao.addOrUpdateStaticAsset(staticAsset, true);
@@ -114,7 +157,7 @@ public class StaticAssetServiceImpl implements StaticAssetService {
                 type = SandBoxOperationType.DELETE;
             }
 
-            sandBoxItemDao.addSandBoxItem(destSandbox, type, SandBoxItemType.STATIC_ASSET, returnAsset.getFullUrl(), returnAsset.getId(), returnAsset.getOriginalAssetId());
+            sandBoxItemDao.addSandBoxItem(destSandbox.getId(), type, SandBoxItemType.STATIC_ASSET, returnAsset.getFullUrl(), returnAsset.getId(), returnAsset.getOriginalAssetId());
             return returnAsset;
         } else {
             // This should happen via a promote, revert, or reject in the sandbox service
@@ -132,28 +175,24 @@ public class StaticAssetServiceImpl implements StaticAssetService {
         return (src == null && dest == null);
     }
 
-    // Returns true if the dest sandbox is production.
-    private boolean checkForProductionSandbox(SandBox dest) {
-        boolean productionSandbox = false;
-
-        if (dest == null) {
-            productionSandbox = true;
-        } else {
-            if (dest.getSite() != null && dest.getSite().getProductionSandbox() != null && dest.getSite().getProductionSandbox().getId() != null) {
-                productionSandbox = dest.getSite().getProductionSandbox().getId().equals(dest.getId());
-            }
-        }
-
-        return productionSandbox;
-    }
+//    // Returns true if the dest sandbox is production.
+//    private boolean checkForProductionSandbox(SandBox dest) {
+//        boolean productionSandbox = false;
+//
+//        if (dest == null) {
+//            productionSandbox = true;
+//        } else {
+//            if (dest.getSite() != null && dest.getSite().getProductionSandbox() != null && dest.getSite().getProductionSandbox().getId() != null) {
+//                productionSandbox = dest.getSite().getProductionSandbox().getId().equals(dest.getId());
+//            }
+//        }
+//
+//        return productionSandbox;
+//    }
 
     // Returns true if the dest sandbox is production.
     private boolean isProductionSandBox(SandBox dest) {
-        if (dest == null) {
-            return true;
-        } else {
-            return SandBoxType.PRODUCTION.equals(dest.getSandBoxType());
-        }
+        return dest == null || SandBoxType.PRODUCTION.equals(dest.getSandBoxType());
     }
 
     @Override
@@ -163,92 +202,13 @@ public class StaticAssetServiceImpl implements StaticAssetService {
     }
 
     @Override
-    public Long countAssets(SandBox sandbox, Criteria criteria) {
-        criteria.add(Restrictions.eq("archivedFlag", false));
-        criteria.setProjection(Projections.rowCount());
-
-        if (sandbox == null) {
-            // Query is hitting the production sandbox.
-            criteria.add(Restrictions.isNull("sandbox"));
-            return (Long) criteria.uniqueResult();
-        } else {
-            Criterion originalSandboxExpression = Restrictions.eq("originalSandBox", sandbox);
-            Criterion currentSandboxExpression = Restrictions.eq("sandbox", sandbox);
-            Criterion productionSandboxExpression;
-            if (sandbox.getSite() == null || sandbox.getSite().getProductionSandbox() == null) {
-                productionSandboxExpression = Restrictions.isNull("sandbox");
-            } else {
-                // Query is hitting the production sandbox.
-                if (sandbox.getId().equals(sandbox.getSite().getProductionSandbox().getId())) {
-                    return (Long) criteria.uniqueResult();
-                }
-                productionSandboxExpression = Restrictions.eq("sandbox", sandbox.getSite().getProductionSandbox());
-            }
-
-            criteria.add(Restrictions.or(Restrictions.or(currentSandboxExpression, productionSandboxExpression), originalSandboxExpression));
-
-            Long resultCount = (Long) criteria.list().get(0);
-            Long updatedCount = 0L;
-            Long deletedCount = 0L;
-
-            // count updated items
-            criteria.add(Restrictions.and(Restrictions.isNotNull("originalAssetId"),Restrictions.or(currentSandboxExpression, originalSandboxExpression)));
-            updatedCount = (Long) criteria.list().get(0);
-
-            // count deleted items
-            criteria.add(Restrictions.and(Restrictions.eq("deletedFlag", true),Restrictions.or(currentSandboxExpression, originalSandboxExpression)));
-            deletedCount = (Long) criteria.list().get(0);
-
-            return resultCount - updatedCount - deletedCount;
-        }
+    public List<StaticAsset> findAssets(SandBox sandbox, Criteria c) {
+        return findItems(sandbox, c, StaticAsset.class, StaticAssetImpl.class, "originalAssetId");
     }
 
     @Override
-    public List<StaticAsset> findAssets(SandBox sandbox, Criteria criteria) {
-        criteria.add(Restrictions.eq("archivedFlag", false));
-
-        if (sandbox == null) {
-            // Query is hitting the production sandbox.
-            criteria.add(Restrictions.isNull("sandbox"));
-            return (List<StaticAsset>) criteria.list();
-        } else {
-            Criterion originalSandboxExpression = Restrictions.eq("originalSandBox", sandbox);
-            Criterion currentSandboxExpression = Restrictions.eq("sandbox", sandbox);
-            Criterion productionSandboxExpression = null;
-            if (sandbox.getSite() == null || sandbox.getSite().getProductionSandbox() == null) {
-                productionSandboxExpression = Restrictions.isNull("sandbox");
-            } else {
-                if (!SandBoxType.PRODUCTION.equals(sandbox.getSandBoxType())) {
-                    productionSandboxExpression = Restrictions.eq("sandbox", sandbox.getSite().getProductionSandbox());
-                }
-            }
-
-            if (productionSandboxExpression != null) {
-                criteria.add(Restrictions.or(Restrictions.or(currentSandboxExpression, productionSandboxExpression), originalSandboxExpression));
-            } else {
-                criteria.add(Restrictions.or(currentSandboxExpression, originalSandboxExpression));
-            }
-
-            List<StaticAsset> resultList = (List<StaticAsset>) criteria.list();
-
-            // Iterate once to build the map
-            LinkedHashMap returnItems = new LinkedHashMap<Long,Page>();
-            for (StaticAsset page : resultList) {
-                returnItems.put(page.getId(), page);
-            }
-
-            // Iterate to remove items from the final list
-            for (StaticAsset asset : resultList) {
-                if (asset.getOriginalAssetId() != null) {
-                    returnItems.remove(asset.getOriginalAssetId());
-                }
-
-                if (asset.getDeletedFlag()) {
-                    returnItems.remove(asset.getId());
-                }
-            }
-            return new ArrayList<StaticAsset>(returnItems.values());
-        }
+    public Long countAssets(SandBox sandbox, Criteria c) {
+       return countItems(sandbox, c, StaticAssetImpl.class, "originalAssetId");
     }
 
     @Override
@@ -321,5 +281,144 @@ public class StaticAssetServiceImpl implements StaticAssetService {
             originalAsset.setLockedFlag(false);
             staticAssetDao.addOrUpdateStaticAsset(originalAsset, false);
         }
+    }
+
+
+    @Override
+    public String getStaticAssetUrlPrefix() {
+        return staticAssetUrlPrefix;
+    }
+
+    @Override
+    public void setStaticAssetUrlPrefix(String staticAssetUrlPrefix) {
+        this.staticAssetUrlPrefix = staticAssetUrlPrefix;
+    }
+
+    @Override
+    public String getStaticAssetEnvironmentUrlPrefix() {
+        return fixEnvironmentUrlPrefix(staticAssetEnvironmentUrlPrefix);
+    }
+
+    @Override
+    public void setStaticAssetEnvironmentUrlPrefix(String staticAssetEnvironmentUrlPrefix) {
+        this.staticAssetEnvironmentUrlPrefix = staticAssetEnvironmentUrlPrefix;
+    }
+
+    @Override
+    public String getStaticAssetEnvironmentSecureUrlPrefix() {
+        if (StringUtils.isEmpty(staticAssetEnvironmentSecureUrlPrefix)) {
+            if (!StringUtils.isEmpty(staticAssetEnvironmentUrlPrefix) && staticAssetEnvironmentUrlPrefix.indexOf("http:") >= 0) {
+                staticAssetEnvironmentSecureUrlPrefix = staticAssetEnvironmentUrlPrefix.replace("http:", "https:");
+            }
+        }
+        return fixEnvironmentUrlPrefix(staticAssetEnvironmentSecureUrlPrefix);
+    }
+
+    public void setStaticAssetEnvironmentSecureUrlPrefix(String staticAssetEnvironmentSecureUrlPrefix) {        
+        this.staticAssetEnvironmentSecureUrlPrefix = staticAssetEnvironmentSecureUrlPrefix;
+    }
+
+    @Override
+    public boolean getAutomaticallyApproveAndPromoteStaticAssets() {
+        return automaticallyApproveAndPromoteStaticAssets;
+    }
+
+    @Override
+    public void setAutomaticallyApproveAndPromoteStaticAssets(boolean automaticallyApproveAndPromoteStaticAssets) {
+        this.automaticallyApproveAndPromoteStaticAssets = automaticallyApproveAndPromoteStaticAssets;
+    }
+
+    /**
+     * Trims whitespace.   If the value is the same as the internal url prefix, then return
+     * null.
+     *
+     * @param urlPrefix
+     * @return
+     */
+    private String fixEnvironmentUrlPrefix(String urlPrefix) {
+        if (urlPrefix != null) {
+            urlPrefix = urlPrefix.trim();
+            if ("".equals(urlPrefix)) {
+                // The value was not set.
+                urlPrefix = null;
+            } else if (urlPrefix.equals(staticAssetUrlPrefix)) {
+                // The value is the same as the default, so no processing needed.
+                urlPrefix = null;
+            }
+        }
+
+        if (urlPrefix != null && !urlPrefix.endsWith("/")) {
+            urlPrefix = urlPrefix + "/";
+        }
+        return urlPrefix;
+    }
+
+    /**
+     * This method will take in an assetPath (think image url) and prepend the
+     * staticAssetUrlPrefix if one exists.
+     * 
+     * Will append any contextPath onto the request.    If the incoming assetPath contains
+     * the internalStaticAssetPrefix and the image is being prepended, the prepend will be
+     * removed.
+     *
+     * @param assetPath     - The path to rewrite if it is a cms managed asset
+     * @param contextPath   - The context path of the web application (if applicable)
+     * @param secureRequest - True if the request is being served over https
+     * @return
+     * @see org.broadleafcommerce.cms.file.service.StaticAssetService#getStaticAssetUrlPrefix()
+     * @see org.broadleafcommerce.cms.file.service.StaticAssetService#getStaticAssetEnvironmentUrlPrefix()
+     */
+    @Override
+    public String convertAssetPath(String assetPath, String contextPath, boolean secureRequest) {
+        String returnValue = assetPath;
+        
+        if (assetPath != null && getStaticAssetEnvironmentUrlPrefix() != null && ! "".equals(getStaticAssetEnvironmentUrlPrefix())) {
+            final String envPrefix;
+            if (secureRequest) {
+                envPrefix = getStaticAssetEnvironmentSecureUrlPrefix();
+            } else {
+                envPrefix = getStaticAssetEnvironmentUrlPrefix();
+            }
+            if (envPrefix != null) {
+                // remove the starting "/" if it exists.
+                if (returnValue.startsWith("/")) {
+                    returnValue = returnValue.substring(1);
+                }
+
+                // Also, remove the "cmsstatic" from the URL before prepending the staticAssetUrlPrefix.
+                if (returnValue.startsWith(getStaticAssetUrlPrefix())) {
+                    returnValue = returnValue.substring(getStaticAssetUrlPrefix().trim().length());
+
+                    // remove the starting "/" if it exists.
+                    if (returnValue.startsWith("/")) {
+                        returnValue = returnValue.substring(1);
+                    }
+                }                
+                returnValue = envPrefix + returnValue;
+            }
+        } else {
+            if (returnValue != null && ! ImportSupport.isAbsoluteUrl(returnValue)) {
+                if (! returnValue.startsWith("/")) {
+                    returnValue = "/" + returnValue;
+                }
+
+                // Add context path
+                if (contextPath != null && ! contextPath.equals("")) {
+                    if (! contextPath.equals("/")) {
+                        // Shouldn't be the case, but let's handle it anyway
+                        if (contextPath.endsWith("/")) {
+                            returnValue = returnValue.substring(1);
+                        }
+                        if (contextPath.startsWith("/")) {
+                            returnValue = contextPath + returnValue;  // normal case
+                        } else {
+                            returnValue = "/" + contextPath + returnValue;
+                        }
+                    }
+                }
+            }
+        }
+
+        return returnValue;
     }
 }

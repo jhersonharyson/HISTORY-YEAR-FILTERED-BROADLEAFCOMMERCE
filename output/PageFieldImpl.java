@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,10 @@
 
 package org.broadleafcommerce.cms.page.domain;
 
+import org.broadleafcommerce.common.presentation.AdminPresentation;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.annotations.Type;
 
 import javax.persistence.Column;
 import javax.persistence.Embedded;
@@ -43,7 +42,6 @@ import javax.persistence.TableGenerator;
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_PAGE_FLD")
-@Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
 @EntityListeners(value = { AdminAuditableListener.class })
 public class PageFieldImpl implements PageField {
 
@@ -71,6 +69,7 @@ public class PageFieldImpl implements PageField {
 
     @Column (name = "LOB_VALUE")
     @Lob
+    @Type(type = "org.hibernate.type.StringClobType")
     protected String lobValue;
 
     @Override
@@ -105,10 +104,10 @@ public class PageFieldImpl implements PageField {
 
     @Override
     public String getValue() {
-        if (lobValue != null && lobValue.length() > 0) {
-            return lobValue;
-        } else {
+        if (stringValue != null && stringValue.length() > 0) {
             return stringValue;
+        } else {
+            return lobValue;
         }
     }
 

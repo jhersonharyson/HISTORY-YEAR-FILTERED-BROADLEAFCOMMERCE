@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,10 +21,12 @@ import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.cms.file.dao.StaticAssetStorageDao;
 import org.broadleafcommerce.cms.file.domain.StaticAsset;
 import org.broadleafcommerce.cms.file.domain.StaticAssetStorage;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
+import org.broadleafcommerce.cms.file.service.operation.NamedOperationManager;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
 import org.broadleafcommerce.openadmin.server.service.artifact.ArtifactService;
 import org.broadleafcommerce.openadmin.server.service.artifact.image.Operation;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.PreDestroy;
@@ -91,6 +93,9 @@ public class StaticAssetStorageServiceImpl implements StaticAssetStorageService 
 
     @Resource(name="blStaticAssetStorageDao")
     protected StaticAssetStorageDao staticAssetStorageDao;
+
+    @Resource(name="blNamedOperationManager")
+    protected NamedOperationManager namedOperationManager;
 
     protected Thread cleanupThread = new Thread(new Runnable() {
         @Override
@@ -171,22 +176,37 @@ public class StaticAssetStorageServiceImpl implements StaticAssetStorageService 
         }
     }
 
-    public Map<String, String> getCacheFileModel(String fullUrl, SandBox sandBox, Map<String, String> parameterMap) throws Exception {
+    protected StaticAsset findStaticAsset(String fullUrl, SandBox sandBox) {
         StaticAsset staticAsset = staticAssetService.findStaticAssetByFullUrl(fullUrl, sandBox);
         if (staticAsset == null && sandBox != null) {
             staticAsset = staticAssetService.findStaticAssetByFullUrl(fullUrl, null);
         }
+
+        return staticAsset;
+    }
+
+    @Transactional("blTransactionManagerAssetStorageInfo")
+    @Override
+    public Map<String, String> getCacheFileModel(String fullUrl, SandBox sandBox, Map<String, String> parameterMap) throws Exception {
+        StaticAsset staticAsset = findStaticAsset(fullUrl, sandBox);
         if (staticAsset == null) {
-            assert sandBox != null;
-            throw new RuntimeException("Unable to find an asset for the url (" + fullUrl + ") using the sandBox id (" + sandBox.getId() + "), or the production sandBox.");
+            if (sandBox == null) {
+                throw new RuntimeException("Unable to find an asset for the url (" + fullUrl + ") using the production sandBox.");
+            } else {
+                throw new RuntimeException("Unable to find an asset for the url (" + fullUrl + ") using the sandBox id (" + sandBox.getId() + "), or the production sandBox.");
+            }
         }
         String mimeType = staticAsset.getMimeType();
-        String cacheName = constructCacheFileName(staticAsset, parameterMap);
+
+        //extract the values for any named parameters
+        Map<String, String> convertedParameters = namedOperationManager.manageNamedParameters(parameterMap);
+
+        String cacheName = constructCacheFileName(staticAsset, convertedParameters);
         File cacheFile = new File(cacheDirectory!=null?new File(cacheDirectory):DEFAULTCACHEDIRECTORY, cacheName);
         if (!cacheFile.exists()) {
             clearObsoleteCacheFiles(staticAsset, cacheFile);
             StaticAssetStorage storage = readStaticAssetStorageByStaticAssetId(staticAsset.getId());
-            if (!parameterMap.isEmpty()) {
+            if (!convertedParameters.isEmpty()) {
                 //there are filter operations to perform on the asset
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 InputStream is = null;
@@ -212,7 +232,7 @@ public class StaticAssetStorageServiceImpl implements StaticAssetStorageService 
                     }
                 }
                 InputStream original = new ByteArrayInputStream(baos.toByteArray());
-                Operation[] operations = artifactService.buildOperations(parameterMap, original, staticAsset.getMimeType());
+                Operation[] operations = artifactService.buildOperations(convertedParameters, original, staticAsset.getMimeType());
                 InputStream converted = artifactService.convert(original, operations, staticAsset.getMimeType());
                 createCacheFile(converted, cacheFile);
                 if ("image/gif".equals(mimeType)) {
@@ -229,31 +249,37 @@ public class StaticAssetStorageServiceImpl implements StaticAssetStorageService 
         return model;
     }
 
+    @Transactional("blTransactionManagerAssetStorageInfo")
     @Override
     public StaticAssetStorage findStaticAssetStorageById(Long id) {
         return staticAssetStorageDao.readStaticAssetStorageById(id);
     }
 
+    @Transactional("blTransactionManagerAssetStorageInfo")
     @Override
     public StaticAssetStorage create() {
         return staticAssetStorageDao.create();
     }
 
+    @Transactional("blTransactionManagerAssetStorageInfo")
     @Override
     public StaticAssetStorage readStaticAssetStorageByStaticAssetId(Long id) {
         return staticAssetStorageDao.readStaticAssetStorageByStaticAssetId(id);
     }
 
+    @Transactional("blTransactionManagerAssetStorageInfo")
     @Override
     public StaticAssetStorage save(StaticAssetStorage assetStorage) {
         return staticAssetStorageDao.save(assetStorage);
     }
 
+    @Transactional("blTransactionManagerAssetStorageInfo")
     @Override
     public void delete(StaticAssetStorage assetStorage) {
         staticAssetStorageDao.delete(assetStorage);
     }
 
+    @Transactional("blTransactionManagerAssetStorageInfo")
     @Override
     public Blob createBlob(MultipartFile uploadedFile) throws IOException {
         return staticAssetStorageDao.createBlob(uploadedFile);
@@ -354,4 +380,5 @@ public class StaticAssetStorageServiceImpl implements StaticAssetStorageService 
     public void setCleanupThreadEnabled(boolean cleanupThreadEnabled) {
         this.cleanupThreadEnabled = cleanupThreadEnabled;
     }
+
 }

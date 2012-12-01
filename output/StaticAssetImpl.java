@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,20 @@
 
 package org.broadleafcommerce.cms.file.domain;
 
+import org.broadleafcommerce.common.locale.domain.LocaleImpl;
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentationClass;
+import org.broadleafcommerce.common.presentation.AdminPresentationMap;
+import org.broadleafcommerce.common.presentation.override.AdminPresentationOverride;
+import org.broadleafcommerce.common.presentation.override.AdminPresentationOverrides;
+import org.broadleafcommerce.common.presentation.PopulateToOneFieldsEnum;
+import org.broadleafcommerce.common.presentation.RequiredOverride;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.sandbox.domain.SandBoxImpl;
+import org.broadleafcommerce.common.site.domain.Site;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
-import org.broadleafcommerce.openadmin.server.domain.SandBoxImpl;
-import org.broadleafcommerce.openadmin.server.domain.Site;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.broadleafcommerce.presentation.AdminPresentationClass;
-import org.broadleafcommerce.presentation.AdminPresentationOverride;
-import org.broadleafcommerce.presentation.AdminPresentationOverrides;
-import org.broadleafcommerce.presentation.PopulateToOneFieldsEnum;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
@@ -63,18 +66,12 @@ import java.util.Map;
 @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
 @AdminPresentationOverrides(
         {
-            @AdminPresentationOverride(name="auditable.createdBy.name", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.updatedBy.name", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.dateCreated", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.dateUpdated", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-            @AdminPresentationOverride(name="auditable.createdBy.login", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.createdBy.password", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.createdBy.email", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.createdBy.currentSandBox", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.login", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.password", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.email", value=@AdminPresentation(excluded = true)),
-            @AdminPresentationOverride(name="auditable.updatedBy.currentSandBox", value=@AdminPresentation(excluded = true)),
+            @AdminPresentationOverride(name="auditable.createdBy.id", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.updatedBy.id", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.createdBy.name", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.updatedBy.name", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.dateCreated", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+            @AdminPresentationOverride(name="auditable.dateUpdated", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
             @AdminPresentationOverride(name="sandbox", value=@AdminPresentation(excluded = true))
         }
 )
@@ -88,10 +85,11 @@ public class StaticAssetImpl implements StaticAsset {
     protected Long id;
 
     @Embedded
+    @AdminPresentation(excluded = true)
     protected AdminAuditable auditable = new AdminAuditable();
 
     @Column (name = "NAME", nullable = false)
-    @AdminPresentation(friendlyName="Item Name", order=1, group = "Details")
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Item_Name", order=1, group = "StaticAssetImpl_Details", requiredOverride = RequiredOverride.NOT_REQUIRED)
     protected String name;
 
     /*@ManyToOne(targetEntity = SiteImpl.class)
@@ -101,28 +99,37 @@ public class StaticAssetImpl implements StaticAsset {
     protected Site site;
 
     @Column(name ="FULL_URL", nullable = false)
-    @AdminPresentation(friendlyName="Full URL", order=2, group = "Details")
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Full_URL", order=2, group = "StaticAssetImpl_Details", requiredOverride = RequiredOverride.NOT_REQUIRED)
     @Index(name="ASST_FULL_URL_INDX", columnNames={"FULL_URL"})
     protected String fullUrl;
 
     @Column(name = "FILE_SIZE")
-    @AdminPresentation(friendlyName="File Size (Bytes)", order=3, group = "Details", readOnly = true)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_File_Size_Bytes", order=3, group = "StaticAssetImpl_Details", readOnly = true)
     protected Long fileSize;
 
     @Column(name = "MIME_TYPE")
-    @AdminPresentation(friendlyName="Mime Type", order=4, group = "Details", readOnly = true)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Mime_Type", order=4, group = "StaticAssetImpl_Details", readOnly = true)
     protected String mimeType;
 
     @Column(name = "FILE_EXTENSION")
-    @AdminPresentation(friendlyName="File Extension", order=5, group = "Details", readOnly = true)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_File_Extension", order=5, group = "StaticAssetImpl_Details", readOnly = true)
     protected String fileExtension;
 
     @ManyToMany(targetEntity = StaticAssetDescriptionImpl.class, cascade = CascadeType.ALL)
-    @JoinTable(name = "BLC_ASSET_DESC_MAP", inverseJoinColumns = @JoinColumn(name = "STATIC_ASSET_DESC_ID", referencedColumnName = "STATIC_ASSET_DESC_ID"))
+    @JoinTable(name = "BLC_ASSET_DESC_MAP", joinColumns = @JoinColumn(name = "STATIC_ASSET_ID"), inverseJoinColumns = @JoinColumn(name = "STATIC_ASSET_DESC_ID"))
     @org.hibernate.annotations.MapKey(columns = {@Column(name = "MAP_KEY", nullable = false)})
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
     @BatchSize(size = 20)
+    @AdminPresentationMap(
+        friendlyName = "assetDescriptionTitle",
+        dataSourceName = "staticAssetDescriptionMapDS",
+        keyPropertyFriendlyName = "SkuImpl_Sku_Media_Key",
+        deleteEntityUponRemove = true,
+        mapKeyOptionEntityClass = LocaleImpl.class,
+        mapKeyOptionEntityDisplayField = "friendlyName",
+        mapKeyOptionEntityValueField = "localeCode"
+    )
     protected Map<String,StaticAssetDescription> contentMessageValues = new HashMap<String,StaticAssetDescription>();
 
     @ManyToOne (targetEntity = SandBoxImpl.class)
@@ -136,22 +143,22 @@ public class StaticAssetImpl implements StaticAsset {
 	protected SandBox originalSandBox;
 
     @Column (name = "ARCHIVED_FLAG")
-    @AdminPresentation(friendlyName="Archived Flag", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Archived_Flag", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="ASST_ARCHVD_FLG_INDX", columnNames={"ARCHIVED_FLAG"})
     protected Boolean archivedFlag = false;
 
     @Column (name = "DELETED_FLAG")
-    @AdminPresentation(friendlyName="Deleted Flag", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Deleted_Flag", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="ASST_DLTD_FLG_INDX", columnNames={"DELETED_FLAG"})
     protected Boolean deletedFlag = false;
 
     @Column (name = "LOCKED_FLAG")
-    @AdminPresentation(friendlyName="Is Locked", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Is_Locked", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="ASST_LCKD_FLG_INDX", columnNames={"LOCKED_FLAG"})
     protected Boolean lockedFlag = false;
 
     @Column (name = "ORIG_ASSET_ID")
-    @AdminPresentation(friendlyName="Original Asset ID", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StaticAssetImpl_Original_Asset_ID", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="ORIG_ASSET_ID_INDX", columnNames={"ORIG_ASSET_ID"})
     protected Long originalAssetId;
 

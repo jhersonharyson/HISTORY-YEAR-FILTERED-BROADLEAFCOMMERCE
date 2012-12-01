@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,7 @@ import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.cms.structure.domain.StructuredContent;
 import org.broadleafcommerce.cms.structure.domain.StructuredContentField;
 import org.broadleafcommerce.cms.structure.domain.StructuredContentType;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
 
 import java.util.List;
 import java.util.Map;
@@ -71,8 +71,7 @@ public interface StructuredContentDao {
     public void delete(StructuredContent content);
 
     /**
-     * Called by the <code>DisplayContentTag</code> to locate content based
-     * on the current SandBox, StructuredContentType, and Locale.
+     * Pass through function for backwards compatibility to get a list of structured content.
      *
      * @param sandBox to search for the content
      * @param type of content to search for
@@ -84,7 +83,19 @@ public interface StructuredContentDao {
 
     /**
      * Called by the <code>DisplayContentTag</code> to locate content based
-     * on the current SandBox, StructuredContentType, Name, and Locale.
+     * on the current SandBox, StructuredContentType, fullLocale and/or languageOnlyLocale.
+     *
+     * @param sandBox to search for the content
+     * @param type of content to search for
+     * @param fullLocale to restrict the search to
+     * @param languageOnlyLocale locale based only on a language specified
+     * @return a list of all matching content
+     * @see org.broadleafcommerce.cms.web.structure.DisplayContentTag
+     */
+    public List<StructuredContent> findActiveStructuredContentByType(SandBox sandBox, StructuredContentType type, Locale fullLocale, Locale languageOnlyLocale);
+
+    /**
+     * Pass through function for backwards compatibility to get a list of structured content.
      *
      * @param sandBox
      * @param type
@@ -93,6 +104,42 @@ public interface StructuredContentDao {
      * @return
      */
     public List<StructuredContent> findActiveStructuredContentByNameAndType(SandBox sandBox, StructuredContentType type, String name, Locale locale);
+
+    /**
+     * Called by the <code>DisplayContentTag</code> to locate content based
+     * on the current SandBox, StructuredContentType, Name, fullLocale and/or languageOnlyLocale.
+     *
+     * @param sandBox
+     * @param type
+     * @param name
+     * @param fullLocale
+     * @param languageOnlyLocale
+     * @return
+     */
+    public List<StructuredContent> findActiveStructuredContentByNameAndType(SandBox sandBox, StructuredContentType type, String name, Locale fullLocale, Locale languageOnlyLocale);
+
+    /**
+     * Pass through function for backwards compatibility to get a list of structured content.
+     *
+     * @param sandBox
+     * @param name
+     * @param locale
+     * @return
+     */
+    public List<StructuredContent> findActiveStructuredContentByName(SandBox sandBox, String name, Locale locale);
+
+    /**
+     * Called by the <code>DisplayContentTag</code> to locate content based
+     * on the current SandBox, StructuredContentType, Name, fullLocale and/or languageOnlyLocale.
+     *
+     * @param sandBox
+     * @param name
+     * @param fullLocale
+     * @param languageOnlyLocale
+     * @return
+     */
+    public List<StructuredContent> findActiveStructuredContentByName(SandBox sandBox, String name, Locale fullLocale, Locale languageOnlyLocale);
+
 
     /**
      * Used to lookup the StructuredContentType by name.

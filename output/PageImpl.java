@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,20 +16,18 @@
 
 package org.broadleafcommerce.cms.page.domain;
 
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentationClass;
+import org.broadleafcommerce.common.presentation.override.AdminPresentationOverride;
+import org.broadleafcommerce.common.presentation.override.AdminPresentationOverrides;
+import org.broadleafcommerce.common.presentation.PopulateToOneFieldsEnum;
+import org.broadleafcommerce.common.presentation.RequiredOverride;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.sandbox.domain.SandBoxImpl;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
-import org.broadleafcommerce.openadmin.server.domain.SandBoxImpl;
-import org.broadleafcommerce.openadmin.server.domain.Site;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.broadleafcommerce.presentation.AdminPresentationClass;
-import org.broadleafcommerce.presentation.AdminPresentationOverride;
-import org.broadleafcommerce.presentation.AdminPresentationOverrides;
-import org.broadleafcommerce.presentation.PopulateToOneFieldsEnum;
 import org.hibernate.annotations.BatchSize;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.Index;
 
@@ -38,6 +36,7 @@ import javax.persistence.Column;
 import javax.persistence.Embedded;
 import javax.persistence.Entity;
 import javax.persistence.EntityListeners;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -47,11 +46,15 @@ import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
+import javax.persistence.MapKeyColumn;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.TableGenerator;
-import javax.persistence.Transient;
+
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Created by bpolster.
@@ -59,30 +62,25 @@ import java.util.Map;
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_PAGE")
-@Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
 @EntityListeners(value = { AdminAuditableListener.class })
 @AdminPresentationOverrides(
     {
-        @AdminPresentationOverride(name="auditable.createdBy.name", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-        @AdminPresentationOverride(name="auditable.updatedBy.name", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-        @AdminPresentationOverride(name="auditable.dateCreated", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-        @AdminPresentationOverride(name="auditable.dateUpdated", value=@AdminPresentation(visibility = VisibilityEnum.HIDDEN_ALL)),
-        @AdminPresentationOverride(name="auditable.createdBy.login", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.createdBy.password", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.createdBy.email", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.createdBy.currentSandBox", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.updatedBy.login", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.updatedBy.password", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.updatedBy.email", value=@AdminPresentation(excluded = true)),
-        @AdminPresentationOverride(name="auditable.updatedBy.currentSandBox", value=@AdminPresentation(excluded = true)),
+        @AdminPresentationOverride(name="auditable.createdBy.id", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+        @AdminPresentationOverride(name="auditable.updatedBy.id", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+        @AdminPresentationOverride(name="auditable.createdBy.name", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+        @AdminPresentationOverride(name="auditable.updatedBy.name", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+        @AdminPresentationOverride(name="auditable.dateCreated", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
+        @AdminPresentationOverride(name="auditable.dateUpdated", value=@AdminPresentation(readOnly = true, visibility = VisibilityEnum.HIDDEN_ALL)),
         @AdminPresentationOverride(name="pageTemplate.templateDescription", value=@AdminPresentation(excluded = true)),
         @AdminPresentationOverride(name="pageTemplate.locale", value=@AdminPresentation(excluded = true))
     }
 )
-@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "basePage")
+@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "PageImpl_basePage")
 public class PageImpl implements Page {
 
     private static final long serialVersionUID = 1L;
+    
+    private static final Integer ZERO = new Integer(0);
 
     @Id
     @GeneratedValue(generator = "PageId", strategy = GenerationType.TABLE)
@@ -92,23 +90,22 @@ public class PageImpl implements Page {
     
     @ManyToOne (targetEntity = PageTemplateImpl.class)
     @JoinColumn(name = "PAGE_TMPLT_ID")
-    @AdminPresentation(friendlyName="Page Template", group = "Basic", order=2, excluded=true, visibility = VisibilityEnum.GRID_HIDDEN)
+    @AdminPresentation(friendlyName = "PageImpl_Page_Template", group = "PageImpl_Basic", order=2, excluded=true, visibility = VisibilityEnum.GRID_HIDDEN, requiredOverride = RequiredOverride.REQUIRED)
     protected PageTemplate pageTemplate;
 
     @Column (name = "DESCRIPTION")
-    @AdminPresentation(friendlyName="Description", order=3, group="Basic", prominent=true)
+    @AdminPresentation(friendlyName = "PageImpl_Description", order=3, group = "PageImpl_Basic", prominent=true)
     protected String description;
 
     @Column (name = "FULL_URL")
     @Index(name="PAGE_FULL_URL_INDEX", columnNames={"FULL_URL"})
-    @AdminPresentation(friendlyName="Full Url", order=1, group="Basic", prominent=true)
+    @AdminPresentation(friendlyName = "PageImpl_Full_Url", order=1, group = "PageImpl_Basic", prominent=true)
     protected String fullUrl;
 
     @ManyToMany(targetEntity = PageFieldImpl.class, cascade = CascadeType.ALL)
     @JoinTable(name = "BLC_PAGE_FLD_MAP", joinColumns = @JoinColumn(name = "PAGE_ID", referencedColumnName = "PAGE_ID"), inverseJoinColumns = @JoinColumn(name = "PAGE_FLD_ID", referencedColumnName = "PAGE_FLD_ID"))
     @org.hibernate.annotations.MapKey(columns = {@Column(name = "MAP_KEY", nullable = false)})
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
-    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
     @BatchSize(size = 20)
     protected Map<String,PageField> pageFields = new HashMap<String,PageField>();
 
@@ -123,32 +120,48 @@ public class PageImpl implements Page {
 	protected SandBox originalSandBox;
 
     @Column (name = "DELETED_FLAG")
-    @AdminPresentation(friendlyName="Deleted", order=2, group="Description", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "PageImpl_Deleted", order=2, group = "PageImpl_Description", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="PAGE_DLTD_FLG_INDX", columnNames={"DELETED_FLAG"})
     protected Boolean deletedFlag = false;
 
     @Column (name = "ARCHIVED_FLAG")
-    @AdminPresentation(friendlyName="Archived", order=5, group="Page", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "PageImpl_Archived", order=5, group = "PageImpl_Page", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="PAGE_ARCHVD_FLG_INDX", columnNames={"ARCHIVED_FLAG"})
     protected Boolean archivedFlag = false;
 
     @Column (name = "LOCKED_FLAG")
-    @AdminPresentation(friendlyName="Is Locked", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "PageImpl_Is_Locked", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="PAGE_LCKD_FLG_INDX", columnNames={"LOCKED_FLAG"})
     protected Boolean lockedFlag = false;
 
     @Column (name = "ORIG_PAGE_ID")
-    @AdminPresentation(friendlyName="Original Page ID", order=6, group="Page", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "PageImpl_Original_Page_ID", order=6, group = "PageImpl_Page", visibility = VisibilityEnum.HIDDEN_ALL)
     @Index(name="ORIG_PAGE_ID_INDX", columnNames={"ORIG_PAGE_ID"})
-    protected Long originalPageId;
+    protected Long originalPageId;      
+    
+    @AdminPresentation(friendlyName = "PageImpl_Priority", order=3, group = "PageImpl_Description")
+    @Column(name = "PRIORITY")
+    protected Integer priority;
+    
+    @AdminPresentation(friendlyName = "PageImpl_Offline", order=4, group = "PageImpl_Description")
+    @Column(name = "OFFLINE_FLAG")
+    protected Boolean offlineFlag = false;     
 
-    /*@ManyToOne(targetEntity = SiteImpl.class)
-    @JoinColumn(name="SITE_ID")*/
-    @Transient
-    @AdminPresentation(excluded = true)
-    protected Site site;
+    @ManyToMany(targetEntity = PageRuleImpl.class, cascade = {CascadeType.ALL})
+    @JoinTable(name = "BLC_PAGE_RULE_MAP", inverseJoinColumns = @JoinColumn(name = "PAGE_RULE_ID", referencedColumnName = "PAGE_RULE_ID"))
+    @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
+    @MapKeyColumn(name = "MAP_KEY", nullable = false)
+    Map<String, PageRule> pageMatchRules = new HashMap<String, PageRule>();
+
+    @OneToMany(fetch = FetchType.LAZY, targetEntity = PageItemCriteriaImpl.class, cascade={CascadeType.ALL})
+    @JoinTable(name = "BLC_QUAL_CRIT_PAGE_XREF", joinColumns = @JoinColumn(name = "PAGE_ID"), inverseJoinColumns = @JoinColumn(name = "PAGE_ITEM_CRITERIA_ID"))
+    @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
+    protected Set<PageItemCriteria> qualifyingItemCriteria = new HashSet<PageItemCriteria>();
+
+    
 
     @Embedded
+    @AdminPresentation(excluded = true)
     protected AdminAuditable auditable = new AdminAuditable();
 
     @Override
@@ -219,15 +232,6 @@ public class PageImpl implements Page {
         this.sandbox = sandbox;
     }
 
-     @Override
-    public Site getSite() {
-        return site;
-    }
-
-    @Override
-    public void setSite(Site site) {
-        this.site = site;
-    }
 
     @Override
     public Long getOriginalPageId() {
@@ -284,11 +288,57 @@ public class PageImpl implements Page {
     public void setLockedFlag(Boolean lockedFlag) {
         this.lockedFlag = lockedFlag;
     }
+    
+    @Override
+    public Boolean getOfflineFlag() {
+        if (offlineFlag == null) {
+            return Boolean.FALSE;
+        } else {
+            return offlineFlag;
+        }
+    }
+
+    @Override
+    public void setOfflineFlag(Boolean offlineFlag) {
+        this.offlineFlag = offlineFlag;
+    }
+
+    @Override
+    public Integer getPriority() {
+    	if (priority == null) {
+    		return ZERO;
+    	}
+        return priority;
+    }
+
+    @Override
+    public void setPriority(Integer priority) {
+        this.priority = priority;
+    }
+    
+    @Override
+    public Map<String, PageRule> getPageMatchRules() {
+        return pageMatchRules;
+    }
+
+    @Override
+    public void setPageMatchRules(Map<String, PageRule> pageMatchRules) {
+        this.pageMatchRules = pageMatchRules;
+    }
+
+    @Override
+    public Set<PageItemCriteria> getQualifyingItemCriteria() {
+        return qualifyingItemCriteria;
+    }
+
+    @Override
+    public void setQualifyingItemCriteria(Set<PageItemCriteria> qualifyingItemCriteria) {
+        this.qualifyingItemCriteria = qualifyingItemCriteria;
+    }
 
     @Override
     public Page cloneEntity() {
         PageImpl newPage = new PageImpl();
-        newPage.site=site;
 
         newPage.archivedFlag = archivedFlag;
         newPage.deletedFlag = deletedFlag;
@@ -296,8 +346,22 @@ public class PageImpl implements Page {
         newPage.description = description;
         newPage.sandbox = sandbox;
         newPage.originalPageId = originalPageId;
+        newPage.offlineFlag = offlineFlag;        
+        newPage.priority = priority;
         newPage.originalSandBox = originalSandBox;
         newPage.fullUrl = fullUrl;
+        
+        Map<String, PageRule> ruleMap = newPage.getPageMatchRules();
+        for (String key : pageMatchRules.keySet()) {
+            PageRule newField = pageMatchRules.get(key).cloneEntity();
+            ruleMap.put(key, newField);
+        }
+
+        Set<PageItemCriteria> criteriaList = newPage.getQualifyingItemCriteria();
+        for (PageItemCriteria pageItemCriteria : qualifyingItemCriteria) {
+            PageItemCriteria newField = pageItemCriteria.cloneEntity();
+            criteriaList.add(newField);
+        }
 
         for (PageField oldPageField: pageFields.values()) {
             PageField newPageField = oldPageField.cloneEntity();

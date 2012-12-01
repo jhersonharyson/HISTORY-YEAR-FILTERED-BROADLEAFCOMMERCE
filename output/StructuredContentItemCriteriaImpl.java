@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +15,6 @@
  */
 
 package org.broadleafcommerce.cms.structure.domain;
-
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.broadleafcommerce.presentation.AdminPresentationClass;
-import org.hibernate.annotations.Cache;
-import org.hibernate.annotations.CacheConcurrencyStrategy;
-import org.hibernate.annotations.GenericGenerator;
-import org.hibernate.annotations.Parameter;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -36,6 +28,13 @@ import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentationClass;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.Parameter;
+import org.hibernate.annotations.Type;
+
 /**
  * 
  * @author jfischer
@@ -44,8 +43,7 @@ import javax.persistence.Table;
 @Entity
 @Table(name = "BLC_SC_ITEM_CRITERIA")
 @Inheritance(strategy=InheritanceType.JOINED)
-@Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
-@AdminPresentationClass(friendlyName = "baseStructuredContentItemCriteria")
+@AdminPresentationClass(friendlyName = "StructuredContentItemCriteriaImpl_baseStructuredContentItemCriteria")
 public class StructuredContentItemCriteriaImpl implements StructuredContentItemCriteria {
 	
 	public static final long serialVersionUID = 1L;
@@ -54,31 +52,32 @@ public class StructuredContentItemCriteriaImpl implements StructuredContentItemC
     @GeneratedValue(generator= "SCItemCriteriaId")
     @GenericGenerator(
         name="SCItemCriteriaId",
-        strategy="org.broadleafcommerce.persistence.IdOverrideTableGenerator",
+        strategy="org.broadleafcommerce.common.persistence.IdOverrideTableGenerator",
         parameters = {
             @Parameter(name="table_name", value="SEQUENCE_GENERATOR"),
             @Parameter(name="segment_column_name", value="ID_NAME"),
             @Parameter(name="value_column_name", value="ID_VAL"),
             @Parameter(name="segment_value", value="StructuredContentItemCriteriaImpl"),
             @Parameter(name="increment_size", value="50"),
-            @Parameter(name="entity_name", value="org.broadleafcommerce.core.offer.domain.StructuredContentItemCriteriaImpl")
+            @Parameter(name="entity_name", value="org.broadleafcommerce.cms.page.domain.StructuredContentItemCriteriaImpl")
         }
     )
     @Column(name = "SC_ITEM_CRITERIA_ID")
-    @AdminPresentation(friendlyName="Item Criteria Id", group="Description", visibility =VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentItemCriteriaImpl_Item_Criteria_Id", group = "StructuredContentItemCriteriaImpl_Description", visibility =VisibilityEnum.HIDDEN_ALL)
     protected Long id;
     
     @Column(name = "QUANTITY", nullable=false)
-    @AdminPresentation(friendlyName="Quantity", group="Description", visibility =VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentItemCriteriaImpl_Quantity", group = "StructuredContentItemCriteriaImpl_Description", visibility =VisibilityEnum.HIDDEN_ALL)
 	protected Integer quantity;
     
     @Lob
+    @Type(type = "org.hibernate.type.StringClobType")
     @Column(name = "ORDER_ITEM_MATCH_RULE")
-    @AdminPresentation(friendlyName="Order Item Match Rule", group="Description", visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentItemCriteriaImpl_Order_Item_Match_Rule", group = "StructuredContentItemCriteriaImpl_Description", visibility = VisibilityEnum.HIDDEN_ALL)
 	protected String orderItemMatchRule;
     
     @ManyToOne(targetEntity = StructuredContentImpl.class)
-    @JoinTable(name = "BLC_QUAL_CRIT_SC_XREF", joinColumns = @JoinColumn(name = "SC_ITEM_CRITERIA_ID"), inverseJoinColumns = @JoinColumn(name = "ID"))
+    @JoinTable(name = "BLC_QUAL_CRIT_SC_XREF", joinColumns = @JoinColumn(name = "SC_ITEM_CRITERIA_ID"), inverseJoinColumns = @JoinColumn(name = "SC_ID"))
     protected StructuredContent structuredContent;
 
 	/* (non-Javadoc)
@@ -172,7 +171,6 @@ public class StructuredContentItemCriteriaImpl implements StructuredContentItemC
         StructuredContentItemCriteriaImpl newField = new StructuredContentItemCriteriaImpl();
         newField.quantity = quantity;
         newField.orderItemMatchRule = orderItemMatchRule;
-        newField.structuredContent = structuredContent;
 
         return newField;
     }

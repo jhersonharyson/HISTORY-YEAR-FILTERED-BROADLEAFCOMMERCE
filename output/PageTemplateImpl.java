@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,10 +20,10 @@ import org.broadleafcommerce.cms.field.domain.FieldGroup;
 import org.broadleafcommerce.cms.field.domain.FieldGroupImpl;
 import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.common.locale.domain.LocaleImpl;
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.broadleafcommerce.presentation.AdminPresentationClass;
-import org.broadleafcommerce.presentation.PopulateToOneFieldsEnum;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentationClass;
+import org.broadleafcommerce.common.presentation.PopulateToOneFieldsEnum;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
@@ -53,7 +53,7 @@ import java.util.List;
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_PAGE_TMPLT")
 @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
-@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "basePageTemplate")
+@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "PageTemplateImpl_basePageTemplate")
 public class PageTemplateImpl implements PageTemplate {
 
     private static final long serialVersionUID = 1L;
@@ -62,18 +62,18 @@ public class PageTemplateImpl implements PageTemplate {
     @GeneratedValue(generator = "PageTemplateId", strategy = GenerationType.TABLE)
     @TableGenerator(name = "PageTemplateId", table = "SEQUENCE_GENERATOR", pkColumnName = "ID_NAME", valueColumnName = "ID_VAL", pkColumnValue = "PageTemplateImpl", allocationSize = 10)
     @Column(name = "PAGE_TMPLT_ID")
-    @AdminPresentation(friendlyName = "Template Id", visibility = VisibilityEnum.HIDDEN_ALL, readOnly = true)
+    @AdminPresentation(friendlyName = "PageTemplateImpl_Template_Id", visibility = VisibilityEnum.HIDDEN_ALL, readOnly = true)
     protected Long id;
 
     @Column (name = "TMPLT_NAME")
-    @AdminPresentation(friendlyName = "Template Name", prominent = true)
+    @AdminPresentation(friendlyName = "PageTemplateImpl_Template_Name", prominent = true)
     protected String templateName;
 
     @Column (name = "TMPLT_DESCR")
     protected String templateDescription;
 
     @Column (name = "TMPLT_PATH")
-    @AdminPresentation(friendlyName = "Template Path", visibility = VisibilityEnum.HIDDEN_ALL, readOnly = true)
+    @AdminPresentation(friendlyName = "PageTemplateImpl_Template_Path", visibility = VisibilityEnum.HIDDEN_ALL, readOnly = true)
     protected String templatePath;
 
     @ManyToOne(targetEntity = LocaleImpl.class)

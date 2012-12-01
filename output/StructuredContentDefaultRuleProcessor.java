@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,7 @@ package org.broadleafcommerce.cms.structure.service;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.broadleafcommerce.cms.structure.domain.StructuredContent;
-import org.broadleafcommerce.cms.structure.domain.StructuredContentRule;
+import org.broadleafcommerce.cms.structure.dto.StructuredContentDTO;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -36,8 +35,6 @@ import java.util.Map;
 public class StructuredContentDefaultRuleProcessor extends AbstractStructuredContentRuleProcessor {
     private static final Log LOG = LogFactory.getLog(StructuredContentDefaultRuleProcessor.class);
 
-    private static String AND = " && ";
-
     /**
      * Returns true if all of the rules associated with the passed in <code>StructuredContent</code>
      * item match based on the passed in vars.
@@ -48,28 +45,17 @@ public class StructuredContentDefaultRuleProcessor extends AbstractStructuredCon
      * @param vars - a map of objects used by the rule MVEL expressions
      * @return the result of the rule checks
      */
-    public boolean checkForMatch(StructuredContent sc, Map<String, Object> vars) {
-        StringBuffer ruleExpression = null;
-        Map<String, StructuredContentRule> ruleMap = sc.getStructuredContentMatchRules();
-        if (ruleMap != null) {
-            for (String ruleKey : ruleMap.keySet()) {
-                if (ruleExpression == null) {
-                    ruleExpression = new StringBuffer(ruleMap.get(ruleKey).getMatchRule());
-                } else {
-                    ruleExpression.append(AND);
-                    ruleExpression.append(ruleMap.get(ruleKey).getMatchRule());
-                }
-            }
-        }
+    public boolean checkForMatch(StructuredContentDTO sc, Map<String, Object> vars) {
+        String ruleExpression = sc.getRuleExpression();
 
         if (ruleExpression != null) {
             if (LOG.isTraceEnabled())  {
-                LOG.trace("Processing content rule for StructuredContent with id " + sc.getId() +".   Value = " + ruleExpression.toString());
+                LOG.trace("Processing content rule for StructuredContent with id " + sc.getId() +".   Value = " + ruleExpression);
             }
-            boolean result = executeExpression(ruleExpression.toString(), vars);
+            boolean result = executeExpression(ruleExpression, vars);
             if (! result) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Content failed to pass rule and will not be included for StructuredContent with id " + sc.getId() +".   Value = " + ruleExpression.toString());
+                    LOG.debug("Content failed to pass rule and will not be included for StructuredContent with id " + sc.getId() +".   Value = " + ruleExpression);
                 }
             }
 

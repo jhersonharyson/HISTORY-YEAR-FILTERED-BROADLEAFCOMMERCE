@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,8 @@
 package org.broadleafcommerce.cms.file.dao;
 
 import org.broadleafcommerce.cms.file.domain.StaticAssetStorage;
-import org.broadleafcommerce.persistence.EntityConfiguration;
+import org.broadleafcommerce.cms.file.domain.StaticAssetStorageImpl;
+import org.broadleafcommerce.common.persistence.EntityConfiguration;
 import org.hibernate.ejb.HibernateEntityManager;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +27,7 @@ import javax.annotation.Resource;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Blob;
@@ -61,7 +63,7 @@ public class StaticAssetStorageDaoImpl implements StaticAssetStorageDao {
 
     @Override
     public StaticAssetStorage readStaticAssetStorageById(Long id) {
-        return (StaticAssetStorage) em.find(entityConfiguration.lookupEntityClass("org.broadleafcommerce.cms.file.domain.StaticAssetStorage"), id);
+        return (StaticAssetStorage) em.find(StaticAssetStorageImpl.class, id);
     }
 
     @Override

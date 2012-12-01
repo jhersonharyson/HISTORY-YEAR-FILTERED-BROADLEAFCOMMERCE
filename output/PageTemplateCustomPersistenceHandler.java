@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,21 +30,21 @@ import org.broadleafcommerce.cms.page.domain.PageFieldImpl;
 import org.broadleafcommerce.cms.page.domain.PageTemplate;
 import org.broadleafcommerce.cms.page.domain.PageTemplateImpl;
 import org.broadleafcommerce.cms.page.service.PageService;
+import org.broadleafcommerce.common.exception.ServiceException;
+import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.web.SandBoxContext;
+import org.broadleafcommerce.openadmin.client.dto.BasicFieldMetadata;
 import org.broadleafcommerce.openadmin.client.dto.ClassMetadata;
 import org.broadleafcommerce.openadmin.client.dto.ClassTree;
 import org.broadleafcommerce.openadmin.client.dto.DynamicResultSet;
 import org.broadleafcommerce.openadmin.client.dto.Entity;
 import org.broadleafcommerce.openadmin.client.dto.FieldMetadata;
-import org.broadleafcommerce.openadmin.client.dto.FieldPresentationAttributes;
 import org.broadleafcommerce.openadmin.client.dto.MergedPropertyType;
 import org.broadleafcommerce.openadmin.client.dto.PersistencePackage;
 import org.broadleafcommerce.openadmin.client.dto.Property;
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.openadmin.client.presentation.SupportedFieldType;
-import org.broadleafcommerce.openadmin.client.service.ServiceException;
 import org.broadleafcommerce.openadmin.server.dao.DynamicEntityDao;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
-import org.broadleafcommerce.openadmin.server.service.SandBoxContext;
 import org.broadleafcommerce.openadmin.server.service.handler.CustomPersistenceHandlerAdapter;
 import org.broadleafcommerce.openadmin.server.service.persistence.SandBoxService;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.InspectHelper;
@@ -124,13 +124,13 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
                 for (FieldDefinition definition : definitions) {
                     Property property = new Property();
                     property.setName(definition.getName());
-                    FieldMetadata fieldMetadata = new FieldMetadata();
+                    BasicFieldMetadata fieldMetadata = new BasicFieldMetadata();
                     property.setMetadata(fieldMetadata);
                     fieldMetadata.setFieldType(definition.getFieldType());
                     fieldMetadata.setMutable(true);
                     fieldMetadata.setInheritedFromType(PageTemplateImpl.class.getName());
                     fieldMetadata.setAvailableToTypes(new String[] {PageTemplateImpl.class.getName()});
-                    fieldMetadata.setCollection(false);
+                    fieldMetadata.setForeignKeyCollection(false);
                     fieldMetadata.setMergedPropertyType(MergedPropertyType.PRIMARY);
                     fieldMetadata.setLength(definition.getMaxLength());
                     if (definition.getFieldEnumeration() != null && !CollectionUtils.isEmpty(definition.getFieldEnumeration().getEnumerationItems())) {
@@ -143,27 +143,25 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
                         }
                         fieldMetadata.setEnumerationValues(enumItems);
                     }
-                    FieldPresentationAttributes attributes = new FieldPresentationAttributes();
-                    fieldMetadata.setPresentationAttributes(attributes);
-                    attributes.setName(definition.getName());
-                    attributes.setFriendlyName(definition.getFriendlyName());
-                    attributes.setSecurityLevel(definition.getSecurityLevel()==null?"":definition.getSecurityLevel());
-                    attributes.setOrder(fieldCount++);
-                    attributes.setVisibility(definition.getHiddenFlag()?VisibilityEnum.HIDDEN_ALL:VisibilityEnum.VISIBLE_ALL);
-                    attributes.setGroup(group.getName());
-                    attributes.setGroupOrder(groupCount);
-                    attributes.setGroupCollapsed(group.getInitCollapsedFlag());
-                    attributes.setExplicitFieldType(SupportedFieldType.UNKNOWN);
-                    attributes.setLargeEntry(definition.getTextAreaFlag());
-                    attributes.setProminent(false);
-                    attributes.setColumnWidth(String.valueOf(definition.getColumnWidth()));
-                    attributes.setBroadleafEnumeration("");
-                    attributes.setReadOnly(false);
+                    fieldMetadata.setName(definition.getName());
+                    fieldMetadata.setFriendlyName(definition.getFriendlyName());
+                    fieldMetadata.setSecurityLevel(definition.getSecurityLevel()==null?"":definition.getSecurityLevel());
+                    fieldMetadata.setOrder(fieldCount++);
+                    fieldMetadata.setVisibility(definition.getHiddenFlag()?VisibilityEnum.HIDDEN_ALL:VisibilityEnum.VISIBLE_ALL);
+                    fieldMetadata.setGroup(group.getName());
+                    fieldMetadata.setGroupOrder(groupCount);
+                    fieldMetadata.setGroupCollapsed(group.getInitCollapsedFlag());
+                    fieldMetadata.setExplicitFieldType(SupportedFieldType.UNKNOWN);
+                    fieldMetadata.setLargeEntry(definition.getTextAreaFlag());
+                    fieldMetadata.setProminent(false);
+                    fieldMetadata.setColumnWidth(String.valueOf(definition.getColumnWidth()));
+                    fieldMetadata.setBroadleafEnumeration("");
+                    fieldMetadata.setReadOnly(false);
                     if (definition.getValidationRegEx() != null) {
                         Map<String, String> itemMap = new HashMap<String, String>();
                         itemMap.put("regularExpression", definition.getValidationRegEx());
                         itemMap.put("errorMessageKey", definition.getValidationErrorMesageKey());
-                        attributes.getValidationConfigurations().put("com.smartgwt.client.widgets.form.validator.RegExpValidator", itemMap);
+                        fieldMetadata.getValidationConfigurations().put("com.smartgwt.client.widgets.form.validator.RegExpValidator", itemMap);
                     }
                     propertiesList.add(property);
                 }
@@ -172,27 +170,25 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
             }
             Property property = new Property();
             property.setName("id");
-            FieldMetadata fieldMetadata = new FieldMetadata();
+            BasicFieldMetadata fieldMetadata = new BasicFieldMetadata();
             property.setMetadata(fieldMetadata);
             fieldMetadata.setFieldType(SupportedFieldType.ID);
             fieldMetadata.setSecondaryType(SupportedFieldType.INTEGER);
             fieldMetadata.setMutable(true);
             fieldMetadata.setInheritedFromType(PageTemplateImpl.class.getName());
             fieldMetadata.setAvailableToTypes(new String[] {PageTemplateImpl.class.getName()});
-            fieldMetadata.setCollection(false);
+            fieldMetadata.setForeignKeyCollection(false);
             fieldMetadata.setMergedPropertyType(MergedPropertyType.PRIMARY);
-            FieldPresentationAttributes attributes = new FieldPresentationAttributes();
-            fieldMetadata.setPresentationAttributes(attributes);
-            attributes.setName("id");
-            attributes.setFriendlyName("ID");
-            attributes.setSecurityLevel("");
-            attributes.setVisibility(VisibilityEnum.VISIBLE_ALL);
-            attributes.setExplicitFieldType(SupportedFieldType.UNKNOWN);
-            attributes.setLargeEntry(false);
-            attributes.setProminent(false);
-            attributes.setColumnWidth("*");
-            attributes.setBroadleafEnumeration("");
-            attributes.setReadOnly(true);
+            fieldMetadata.setName("id");
+            fieldMetadata.setFriendlyName("PagesCustomPersistenceHandler_ID");
+            fieldMetadata.setSecurityLevel("");
+            fieldMetadata.setVisibility(VisibilityEnum.VISIBLE_ALL);
+            fieldMetadata.setExplicitFieldType(SupportedFieldType.UNKNOWN);
+            fieldMetadata.setLargeEntry(false);
+            fieldMetadata.setProminent(false);
+            fieldMetadata.setColumnWidth("*");
+            fieldMetadata.setBroadleafEnumeration("");
+            fieldMetadata.setReadOnly(true);
             propertiesList.add(property);
 
             Property[] properties = new Property[propertiesList.size()];
@@ -202,20 +198,20 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
                     /*
                          * First, compare properties based on order fields
                          */
-                    if (o1.getMetadata().getPresentationAttributes().getOrder() != null && o2.getMetadata().getPresentationAttributes().getOrder() != null) {
-                        return o1.getMetadata().getPresentationAttributes().getOrder().compareTo(o2.getMetadata().getPresentationAttributes().getOrder());
-                    } else if (o1.getMetadata().getPresentationAttributes().getOrder() != null && o2.getMetadata().getPresentationAttributes().getOrder() == null) {
+                    if (o1.getMetadata().getOrder() != null && o2.getMetadata().getOrder() != null) {
+                        return o1.getMetadata().getOrder().compareTo(o2.getMetadata().getOrder());
+                    } else if (o1.getMetadata().getOrder() != null && o2.getMetadata().getOrder() == null) {
                         /*
                               * Always favor fields that have an order identified
                               */
                         return -1;
-                    } else if (o1.getMetadata().getPresentationAttributes().getOrder() == null && o2.getMetadata().getPresentationAttributes().getOrder() != null) {
+                    } else if (o1.getMetadata().getOrder() == null && o2.getMetadata().getOrder() != null) {
                         /*
                               * Always favor fields that have an order identified
                               */
                         return 1;
-                    } else if (o1.getMetadata().getPresentationAttributes().getFriendlyName() != null && o2.getMetadata().getPresentationAttributes().getFriendlyName() != null) {
-                        return o1.getMetadata().getPresentationAttributes().getFriendlyName().compareTo(o2.getMetadata().getPresentationAttributes().getFriendlyName());
+                    } else if (o1.getMetadata().getFriendlyName() != null && o2.getMetadata().getFriendlyName() != null) {
+                        return o1.getMetadata().getFriendlyName().compareTo(o2.getMetadata().getFriendlyName());
                     } else {
                         return o1.getName().compareTo(o2.getName());
                     }
@@ -226,7 +222,7 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
 
             return results;
         } catch (Exception e) {
-            LOG.error(e);
+            LOG.error("Unable to perform inspect for entity: "+ceilingEntityFullyQualifiedClassname, e);
             throw new ServiceException("Unable to perform inspect for entity: "+ceilingEntityFullyQualifiedClassname, e);
         }
     }
@@ -241,7 +237,7 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
 
             return results;
         } catch (Exception e) {
-            LOG.error(e);
+            LOG.error("Unable to perform fetch for entity: "+ceilingEntityFullyQualifiedClassname, e);
             throw new ServiceException("Unable to perform fetch for entity: "+ceilingEntityFullyQualifiedClassname, e);
         }
     }
@@ -260,7 +256,10 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
                 String value = null;
                 if (!MapUtils.isEmpty(pageFieldMap)) {
                     PageField pageField = pageFieldMap.get(definition.getName());
-                    value = pageField.getValue();
+                    if(pageField==null)
+                    	value="";
+                     else
+                        value = pageField.getValue();
                 }
                 property.setValue(value);
             }
@@ -318,8 +317,8 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
 
             return fetchEntityBasedOnId(pageId);
         } catch (Exception e) {
-            LOG.error(e);
-            throw new ServiceException("Unable to perform fetch for entity: "+ceilingEntityFullyQualifiedClassname, e);
+            LOG.error("Unable to perform update for entity: "+ceilingEntityFullyQualifiedClassname, e);
+            throw new ServiceException("Unable to perform update for entity: "+ceilingEntityFullyQualifiedClassname, e);
         }
     }
 }

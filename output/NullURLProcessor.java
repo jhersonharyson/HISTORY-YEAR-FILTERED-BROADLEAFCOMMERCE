@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,7 +47,7 @@ public class NullURLProcessor implements URLProcessor {
     }
 
     /**
-     *  The processURL method should not be called or the NullURLProcessor.   This class provides a cacheable
+     *  The processURL method should not be called on the NullURLProcessor.   This class provides a cacheable
      *  instance of URLProcessor that indicates to the controlling program (@see BroadleafProcessURLFilter)
      *  that the current URL cannot be processed.
      *
@@ -55,7 +55,7 @@ public class NullURLProcessor implements URLProcessor {
      * @return true if the processor was able to process the passed in URL.
      * @throws UnsupportedOperationException
      */
-    public void processURL(String requestURI) {
+    public boolean processURL(String requestURI) {
         throw new UnsupportedOperationException();
     }
 }

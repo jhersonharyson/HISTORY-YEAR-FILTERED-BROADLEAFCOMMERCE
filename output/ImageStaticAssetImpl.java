@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 package org.broadleafcommerce.cms.file.domain;
 
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
-import org.broadleafcommerce.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentation;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -34,11 +34,11 @@ import javax.persistence.*;
 public class ImageStaticAssetImpl extends StaticAssetImpl implements ImageStaticAsset {
 
     @Column(name ="WIDTH")
-    @AdminPresentation(friendlyName="Width", order=1, group = "Image Details", readOnly = true)
+    @AdminPresentation(friendlyName = "ImageStaticAssetImpl_Width", order=1, group = "ImageStaticAssetImpl_Image_Details", readOnly = true)
     protected Integer width;
 
     @Column(name ="HEIGHT")
-    @AdminPresentation(friendlyName="Height", order=2, group = "Image Details", readOnly = true)
+    @AdminPresentation(friendlyName = "ImageStaticAssetImpl_Height", order=2, group = "ImageStaticAssetImpl_Image_Details", readOnly = true)
     protected Integer height;
 
     @Override

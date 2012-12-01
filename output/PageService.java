@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,15 +16,17 @@
 
 package org.broadleafcommerce.cms.page.service;
 
-import java.util.List;
-import java.util.Map;
-
-import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.cms.page.domain.Page;
+import org.broadleafcommerce.cms.page.dto.PageDTO;
 import org.broadleafcommerce.cms.page.domain.PageField;
 import org.broadleafcommerce.cms.page.domain.PageTemplate;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
+import org.broadleafcommerce.cms.page.message.ArchivedPagePublisher;
+import org.broadleafcommerce.common.locale.domain.Locale;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
 import org.hibernate.Criteria;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by bpolster.
@@ -103,6 +105,21 @@ public interface PageService {
 
 
     /**
+     * Looks up the page from the backend datastore.   Processes the page's fields to
+     * fix the URL if the site has overridden the URL for images.   If secure is true
+     * and images are being overridden, the system will use https.
+     *
+     * @param currentSandbox - current sandbox
+     * @param locale - current locale
+     * @param uri - the URI to return a page for
+     * @param ruleDTOs - ruleDTOs that are used as the data to process page rules
+     * @param secure - set to true if current request is over HTTPS
+     * @return
+     */
+    PageDTO findPageByURI(SandBox currentSandbox, Locale locale, String uri, Map<String,Object> ruleDTOs, boolean secure);
+
+
+    /**
      * If deleting and item where page.originalPageId != null
      * then the item is deleted from the database.
      *
@@ -115,14 +132,23 @@ public interface PageService {
      */
     void deletePage(Page page, SandBox destinationSandbox);
 
-
-    /**
-     * Retrieve the page if one is available for the passed in uri.
-     */
-    Page findPageByURI(SandBox currentSandbox, Locale locale, String uri);
-
     List<Page> findPages(SandBox sandBox, Criteria criteria);
 
     Long countPages(SandBox sandBox, Criteria criteria);
 
+    /**
+     * Call to evict both secure and non-secure pages matching
+     * the passed in key.
+     *
+     * @param baseKey
+     */
+    void removePageFromCache(String baseKey);
+    
+    List<ArchivedPagePublisher> getArchivedPageListeners();
+
+    void setArchivedPageListeners(List<ArchivedPagePublisher> archivedPageListeners);
+
+    public boolean isAutomaticallyApproveAndPromotePages();
+
+    public void setAutomaticallyApproveAndPromotePages(boolean automaticallyApproveAndPromotePages);
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,14 +16,16 @@
 
 package org.broadleafcommerce.cms.page.dao;
 
-import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.cms.page.domain.Page;
 import org.broadleafcommerce.cms.page.domain.PageField;
+import org.broadleafcommerce.cms.page.domain.PageImpl;
 import org.broadleafcommerce.cms.page.domain.PageTemplate;
-import org.broadleafcommerce.openadmin.server.domain.SandBox;
-import org.broadleafcommerce.openadmin.server.domain.SandBoxImpl;
-import org.broadleafcommerce.openadmin.server.domain.SandBoxType;
-import org.broadleafcommerce.persistence.EntityConfiguration;
+import org.broadleafcommerce.cms.page.domain.PageTemplateImpl;
+import org.broadleafcommerce.common.locale.domain.Locale;
+import org.broadleafcommerce.common.persistence.EntityConfiguration;
+import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.sandbox.domain.SandBoxImpl;
+import org.broadleafcommerce.common.sandbox.domain.SandBoxType;
 import org.hibernate.ejb.QueryHints;
 import org.springframework.stereotype.Repository;
 
@@ -31,6 +33,7 @@ import javax.annotation.Resource;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,12 +57,12 @@ public class PageDaoImpl implements PageDao {
 
     @Override
     public Page readPageById(Long id) {
-        return (Page) em.find(entityConfiguration.lookupEntityClass("org.broadleafcommerce.cms.page.domain.Page"), id);
+        return (Page) em.find(PageImpl.class, id);
     }
 
     @Override
     public PageTemplate readPageTemplateById(Long id) {
-        return (PageTemplate) em.find(entityConfiguration.lookupEntityClass("org.broadleafcommerce.cms.page.domain.PageTemplate"), id);
+        return (PageTemplate) em.find(PageTemplateImpl.class, id);
     }
 
     @Override
@@ -95,32 +98,34 @@ public class PageDaoImpl implements PageDao {
     }
 
     @Override
-    public Page findPageByURI(SandBox sandBox, Locale locale, String uri) {
+    public List<Page> findPageByURI(SandBox sandBox, Locale fullLocale, Locale languageOnlyLocale, String uri) {
         Query query;
+
+        if (languageOnlyLocale == null)  {
+            languageOnlyLocale = fullLocale;
+        }
+
+        // locale
         if (sandBox == null) {
             query = em.createNamedQuery("BC_READ_PAGE_BY_URI");
-            query.setParameter("uri", uri);
-            query.setParameter("locale", locale);
         } else if (SandBoxType.PRODUCTION.equals(sandBox)) {
             query = em.createNamedQuery("BC_READ_PAGE_BY_URI_AND_PRODUCTION_SANDBOX");
             query.setParameter("sandbox", sandBox);
-            query.setParameter("locale", locale);
-            query.setParameter("uri", uri);
         } else {
             query = em.createNamedQuery("BC_READ_PAGE_BY_URI_AND_USER_SANDBOX");
-            query.setParameter("sandbox", sandBox);
-            query.setParameter("locale", locale);
-            query.setParameter("uri", uri);
+            query.setParameter("sandboxId", sandBox.getId());
         }
 
-        query.setHint(QueryHints.HINT_CACHEABLE, true);
+        query.setParameter("fullLocale", fullLocale);
+        query.setParameter("languageOnlyLocale", languageOnlyLocale);
+        query.setParameter("uri", uri);
 
-        List<Page> results = query.getResultList();
-        if (results != null && !results.isEmpty()) {
-            return results.get(0);
-        } else {
-            return null;
-        }
+        return query.getResultList();
+    }
+
+    @Override
+    public List<Page> findPageByURI(SandBox sandBox, Locale locale, String uri) {
+        return findPageByURI(sandBox, locale, null, uri);
     }
 
     @Override

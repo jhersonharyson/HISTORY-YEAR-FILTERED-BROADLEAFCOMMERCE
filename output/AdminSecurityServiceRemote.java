@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,26 +16,38 @@
 
 package org.broadleafcommerce.openadmin.server.security.remote;
 
-import javax.annotation.Resource;
-
 import com.gwtincubator.security.exception.ApplicationSecurityException;
 import org.broadleafcommerce.openadmin.client.datasource.dynamic.operation.EntityOperationType;
 import org.broadleafcommerce.openadmin.client.service.AdminSecurityService;
-import org.broadleafcommerce.openadmin.client.service.ServiceException;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminPermission;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminRole;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.broadleafcommerce.openadmin.server.security.service.type.PermissionType;
-import org.broadleafcommerce.openadmin.server.service.ExploitProtectionService;
-import org.broadleafcommerce.openadmin.server.service.SandBoxContext;
+import org.broadleafcommerce.common.exception.ServiceException;
+import org.broadleafcommerce.common.security.service.ExploitProtectionService;
+import org.broadleafcommerce.common.web.SandBoxContext;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
+
 /**
- * 
+ * Service for handeling security with Ajax components.  Serves two functions.
+ * <ul>
+ *     <li>
+ *         Converts the ServerSide AdminUser to a client level admin user with
+ *         appropriate roles defined.
+ *     </li>
+ *     <li>
+ *         Provides a method to check if the current logged in user matches the
+ *         client side user and verifies whether that user has access to the
+ *         entity operation they are trying to perform.
+ *     </li>
+ * </ul>
+ * 1.
  * @author jfischer
  *
  */
@@ -52,7 +64,8 @@ public class AdminSecurityServiceRemote implements AdminSecurityService  {
 
     private boolean isEntitySecurityExplicit = false;
 	
-	public org.broadleafcommerce.openadmin.client.security.AdminUser getAdminUser() throws ServiceException, ApplicationSecurityException {
+	@Override
+    public org.broadleafcommerce.openadmin.client.security.AdminUser getAdminUser() throws ServiceException, ApplicationSecurityException {
         AdminUser persistentAdminUser = getPersistentAdminUser();
         if (persistentAdminUser != null) {
             org.broadleafcommerce.openadmin.client.security.AdminUser response = new org.broadleafcommerce.openadmin.client.security.AdminUser();
@@ -67,6 +80,10 @@ public class AdminSecurityServiceRemote implements AdminSecurityService  {
             }
             response.setUserName(persistentAdminUser.getLogin());
             response.setCurrentSandBoxId(String.valueOf(SandBoxContext.getSandBoxContext().getSandBoxId()));
+            response.setEmail(persistentAdminUser.getEmail());
+            response.setName(persistentAdminUser.getName());
+            response.setPhoneNumber(persistentAdminUser.getPhoneNumber());
+            response.setId(persistentAdminUser.getId());
             return response;
         }
 
@@ -78,10 +95,9 @@ public class AdminSecurityServiceRemote implements AdminSecurityService  {
         if (ctx != null) {
             Authentication auth = ctx.getAuthentication();
             if (auth != null && !auth.getName().equals(ANONYMOUS_USER_NAME)) {
-                User temp = (User) auth.getPrincipal();
-                AdminUser adminUser = securityService.readAdminUserByUserName(temp.getUsername());
+                UserDetails temp = (UserDetails) auth.getPrincipal();
 
-                return adminUser;
+                return securityService.readAdminUserByUserName(temp.getUsername());
             }
         }
 
@@ -117,7 +133,7 @@ public class AdminSecurityServiceRemote implements AdminSecurityService  {
         boolean isQualified = securityService.isUserQualifiedForOperationOnCeilingEntity(persistentAdminUser, permissionType, ceilingEntityFullyQualifiedName);
         if (!isQualified){
             //If explicit security, then this check failed. However, if not explicit security, then check to make sure there is no configured security for this entity before allowing to pass
-            if (isEntitySecurityExplicit || securityService.doesOperationExistForCeilingEntity(permissionType, ceilingEntityFullyQualifiedName)) {
+            if (isEntitySecurityExplicit() || securityService.doesOperationExistForCeilingEntity(permissionType, ceilingEntityFullyQualifiedName)) {
                 throw new ServiceException("Security Check Failed for entity operation: " + operationType.toString() + " (" + ceilingEntityFullyQualifiedName + ")");
             }
         }

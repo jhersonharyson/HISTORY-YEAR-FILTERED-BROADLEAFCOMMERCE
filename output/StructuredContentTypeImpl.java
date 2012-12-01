@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2009 the original author or authors.
+ * Copyright 2008-2012 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *       http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,11 @@
 
 package org.broadleafcommerce.cms.structure.domain;
 
-import org.broadleafcommerce.openadmin.client.dto.VisibilityEnum;
-import org.broadleafcommerce.presentation.AdminPresentation;
-import org.broadleafcommerce.presentation.AdminPresentationClass;
-import org.broadleafcommerce.presentation.PopulateToOneFieldsEnum;
-import org.broadleafcommerce.presentation.RequiredOverride;
+import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.presentation.AdminPresentation;
+import org.broadleafcommerce.common.presentation.AdminPresentationClass;
+import org.broadleafcommerce.common.presentation.PopulateToOneFieldsEnum;
+import org.broadleafcommerce.common.presentation.RequiredOverride;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -43,7 +43,7 @@ import javax.persistence.TableGenerator;
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_SC_TYPE")
 @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
-@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "baseStructuredContentType")
+@AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.TRUE, friendlyName = "StructuredContentTypeImpl_baseStructuredContentType")
 public class StructuredContentTypeImpl implements StructuredContentType {
 
     private static final long serialVersionUID = 1L;
@@ -55,16 +55,16 @@ public class StructuredContentTypeImpl implements StructuredContentType {
     protected Long id;
 
     @Column (name = "NAME")
-    @AdminPresentation(friendlyName="Name", order=1, group="Details", prominent=true)
+    @AdminPresentation(friendlyName = "StructuredContentTypeImpl_Name", order=1, group = "StructuredContentTypeImpl_Details", prominent=true)
     protected String name;
 
     @Column (name = "DESCRIPTION")
-    @AdminPresentation(friendlyName="Description", order=2, group="Details",prominent=true)
+    @AdminPresentation(friendlyName = "StructuredContentTypeImpl_Description", order=2, group = "StructuredContentTypeImpl_Details",prominent=true)
     protected String description;
 
     @ManyToOne(targetEntity = StructuredContentFieldTemplateImpl.class)
     @JoinColumn(name="SC_FLD_TMPLT_ID")
-    @AdminPresentation(friendlyName="Content Template", order=2, group="Details", requiredOverride = RequiredOverride.REQUIRED, visibility = VisibilityEnum.HIDDEN_ALL)
+    @AdminPresentation(friendlyName = "StructuredContentTypeImpl_Content_Template", order=2, group = "StructuredContentTypeImpl_Details", requiredOverride = RequiredOverride.REQUIRED, visibility = VisibilityEnum.HIDDEN_ALL)
     protected StructuredContentFieldTemplate structuredContentFieldTemplate;
 
     @Override
