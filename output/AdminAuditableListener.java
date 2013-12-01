@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,16 +16,17 @@
 
 package org.broadleafcommerce.openadmin.audit;
 
-import org.broadleafcommerce.common.time.SystemTime;
-import org.broadleafcommerce.common.web.SandBoxContext;
-import org.broadleafcommerce.openadmin.security.AdminSandBoxContext;
+import java.lang.reflect.Field;
+import java.util.Calendar;
 
 import javax.persistence.Embedded;
 import javax.persistence.Entity;
 import javax.persistence.PrePersist;
 import javax.persistence.PreUpdate;
-import java.lang.reflect.Field;
-import java.util.Calendar;
+
+import org.broadleafcommerce.common.time.SystemTime;
+import org.broadleafcommerce.common.web.SandBoxContext;
+import org.broadleafcommerce.openadmin.security.AdminSandBoxContext;
 
 public class AdminAuditableListener {
 
@@ -35,17 +36,17 @@ public class AdminAuditableListener {
             Field field = getSingleField(entity.getClass(), "auditable");
             field.setAccessible(true);
             if (field.isAnnotationPresent(Embedded.class)) {
-            	Object auditable = field.get(entity);
-            	if (auditable == null) {
-            		field.set(entity, new AdminAuditable());
-            		auditable = field.get(entity);
-            	}
-        		Field temporalCreatedField = auditable.getClass().getDeclaredField("dateCreated");
+                Object auditable = field.get(entity);
+                if (auditable == null) {
+                    field.set(entity, new AdminAuditable());
+                    auditable = field.get(entity);
+                }
+                Field temporalCreatedField = auditable.getClass().getDeclaredField("dateCreated");
                 Field temporalUpdatedField = auditable.getClass().getDeclaredField("dateUpdated");
-        		Field agentField = auditable.getClass().getDeclaredField("createdBy");
-        		setAuditValueTemporal(temporalCreatedField, auditable);
+                Field agentField = auditable.getClass().getDeclaredField("createdBy");
+                setAuditValueTemporal(temporalCreatedField, auditable);
                 setAuditValueTemporal(temporalUpdatedField, auditable);
-        		setAuditValueAgent(agentField, auditable);
+                setAuditValueAgent(agentField, auditable);
             }
         }
     }
@@ -56,37 +57,38 @@ public class AdminAuditableListener {
             Field field = getSingleField(entity.getClass(), "auditable");
             field.setAccessible(true);
             if (field.isAnnotationPresent(Embedded.class)) {
-            	Object auditable = field.get(entity);
-            	if (auditable == null) {
-            		field.set(entity, new AdminAuditable());
-            		auditable = field.get(entity);
-            	}
-        		Field temporalField = auditable.getClass().getDeclaredField("dateUpdated");
-        		Field agentField = auditable.getClass().getDeclaredField("updatedBy");
-        		setAuditValueTemporal(temporalField, auditable);
-        		setAuditValueAgent(agentField, auditable);
+                Object auditable = field.get(entity);
+                if (auditable == null) {
+                    field.set(entity, new AdminAuditable());
+                    auditable = field.get(entity);
+                }
+                Field temporalField = auditable.getClass().getDeclaredField("dateUpdated");
+                Field agentField = auditable.getClass().getDeclaredField("updatedBy");
+                setAuditValueTemporal(temporalField, auditable);
+                setAuditValueAgent(agentField, auditable);
             }
         }
     }
 
     protected void setAuditValueTemporal(Field field, Object entity) throws IllegalArgumentException, IllegalAccessException {
-    	Calendar cal = SystemTime.asCalendar();
-    	field.setAccessible(true);
-    	field.set(entity, cal.getTime());
+        Calendar cal = SystemTime.asCalendar();
+        field.setAccessible(true);
+        field.set(entity, cal.getTime());
     }
 
     protected void setAuditValueAgent(Field field, Object entity) throws IllegalArgumentException, IllegalAccessException {
-    	try {
-            AdminSandBoxContext context = (AdminSandBoxContext) SandBoxContext.getSandBoxContext();
-            if (context != null) {
+        try {
+            SandBoxContext context = SandBoxContext.getSandBoxContext();
+            if (context != null && context instanceof AdminSandBoxContext) {
+                AdminSandBoxContext adminContext = (AdminSandBoxContext) context;
                 field.setAccessible(true);
-                field.set(entity, context.getAdminUser());
+                field.set(entity, adminContext.getAdminUser().getId());
             }
         } catch (IllegalStateException e) {
             //do nothing
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private Field getSingleField(Class<?> clazz, String fieldName) throws IllegalStateException {

@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +16,8 @@
 
 package org.broadleafcommerce.openadmin.server.security.dao;
 
-import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
+import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.hibernate.ejb.QueryHints;
 import org.springframework.stereotype.Repository;
 
@@ -42,9 +42,9 @@ public class AdminUserDaoImpl implements AdminUserDao {
     protected EntityConfiguration entityConfiguration;
 
     public void deleteAdminUser(AdminUser user) {
-    	if (!em.contains(user)) {
-        	user = em.find(entityConfiguration.lookupEntityClass("org.broadleafcommerce.openadmin.server.security.domain.AdminUser", AdminUser.class), user.getId());
-    	}
+        if (!em.contains(user)) {
+            user = em.find(entityConfiguration.lookupEntityClass("org.broadleafcommerce.openadmin.server.security.domain.AdminUser", AdminUser.class), user.getId());
+        }
         em.remove(user);
     }
 
@@ -53,7 +53,12 @@ public class AdminUserDaoImpl implements AdminUserDao {
     }
 
     public AdminUser saveAdminUser(AdminUser user) {
-        return em.merge(user);
+        if (em.contains(user) || user.getId() != null) {
+            return em.merge(user);
+        } else {
+            em.persist(user);
+            return user;
+        }
     }
 
     public AdminUser readAdminUserByUserName(String userName) {

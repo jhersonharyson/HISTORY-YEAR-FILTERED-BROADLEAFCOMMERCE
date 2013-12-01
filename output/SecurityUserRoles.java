@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,9 +23,9 @@ package org.broadleafcommerce.openadmin.security;
  */
 public class SecurityUserRoles {
 
-	public static final String MERCHANDISER = "ROLE_MERCHANDISER";
-	public static final String PROMOTION_CONTROLLER = "ROLE_PROMOTION_CONTROLLER";
-	public static final String USER_ADMINISTRATOR = "ROLE_USER_ADMINISTRATOR";
-	public static final String USER = "ROLE_USER";
-	
+    public static final String MERCHANDISER = "ROLE_MERCHANDISER";
+    public static final String PROMOTION_CONTROLLER = "ROLE_PROMOTION_CONTROLLER";
+    public static final String USER_ADMINISTRATOR = "ROLE_USER_ADMINISTRATOR";
+    public static final String USER = "ROLE_USER";
+    
 }

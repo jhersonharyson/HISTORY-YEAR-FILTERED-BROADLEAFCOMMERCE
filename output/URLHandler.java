@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,24 +16,24 @@
 
 package org.broadleafcommerce.cms.url.domain;
 
-import java.io.Serializable;
-
 import org.broadleafcommerce.cms.url.type.URLRedirectType;
+
+import java.io.Serializable;
 
 public interface URLHandler extends  Serializable{
 
-	public abstract Long getId();
+    public abstract Long getId();
 
-	public abstract void setId(Long id);
+    public abstract void setId(Long id);
 
-	public abstract String getIncomingURL();
+    public abstract String getIncomingURL();
 
-	public abstract void setIncomingURL(String incomingURL);
+    public abstract void setIncomingURL(String incomingURL);
 
-	public abstract String getNewURL();
+    public abstract String getNewURL();
 
-	public abstract void setNewURL(String newURL);
+    public abstract void setNewURL(String newURL);
 
-	 public abstract URLRedirectType getUrlRedirectType();
-	 public void setUrlRedirectType(URLRedirectType redirectType);
+     public abstract URLRedirectType getUrlRedirectType();
+     public void setUrlRedirectType(URLRedirectType redirectType);
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,82 +14,91 @@
  * limitations under the License.
  */
 
-package org.broadleafcommerce.openadmin.server.security.domain;
-
-import org.broadleafcommerce.common.sandbox.domain.SandBox;
+package org.broadleafcommerce.openadmin.server.security.remote;
 
 import java.io.Serializable;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 
  * @author jfischer
  *
  */
-public interface AdminUser extends AdminSecurityContext {
-    public Long getId();
-    public String getName();
-    public void setName(String name);
-    public String getLogin();
-    public void setLogin(String login);
-    public String getPassword();
-    public void setPassword(String password);
-    public String getEmail();
-    public void setEmail(String email);
-    public Set<AdminRole> getAllRoles();
-    public void setAllRoles(Set<AdminRole> allRoles);
-    public String getUnencodedPassword();
-    public void setUnencodedPassword(String unencodedPassword);
+public class AdminUser implements Serializable {
 
-    /**
-     * Stores the user's phone number.
-     * @param phone
-     */
-    public void setPhoneNumber(String phone);
+    private static final long serialVersionUID = 1L;
 
-    /**
-     * Returns the users phone number.
-     * @return
-     */
-    public String getPhoneNumber();
+    protected String userName;
+    protected List<String> roles = new ArrayList<String>();
+    protected List<String> permissions = new ArrayList<String>();
+    protected String currentSandBoxId;
+    protected Long id;
+    protected String email;
+    protected String phoneNumber;
+    protected String name;
+    
+    public List<String> getRoles() {
+        return roles;
+    }
+    
+    public void setRoles(List<String> roles) {
+        this.roles = roles;
+    }
+    
+    public List<String> getPermissions() {
+        return permissions;
+    }
+    
+    public void setPermissions(List<String> permissions) {
+        this.permissions = permissions;
+    }
 
-    /**
-     * Sets the users active status.   A user whose active status is set to false
-     * will not be able to login.
-     *
-     * @param activeStatus
-     */
-    public void setActiveStatusFlag(Boolean activeStatus);
+    public String getUserName() {
+        return userName;
+    }
 
-    /**
-     * Returns the users active status.    A user whose active status is set to
-     * false will not be able to login.
-     *
-     * @return
-     */
-    public Boolean getActiveStatusFlag();
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
 
-    /**
-     * The current sandbox associated with this user.
-     * This is primarily intended to be used by the BLC-CMS workflow
-     * processes.
-     *
-     * If null, the user is using their own SandBox.
-     *
-     * @return
-     */
-    public SandBox getOverrideSandBox();
+    public String getCurrentSandBoxId() {
+        return currentSandBoxId;
+    }
 
-    /**
-     * Overrides the user's sandbox.    This could be used
-     * to setup shared sandboxes.  Setting to null will
-     * mean that the user is setup to use the sandbox associated
-     * with their user.
-     *
-     * @param sandbox
-     */
-    public void setOverrideSandBox(SandBox sandbox);
+    public void setCurrentSandBoxId(String currentSandBoxId) {
+        this.currentSandBoxId = currentSandBoxId;
+    }
 
-    public Set<AdminPermission> getAllPermissions();
-    public void setAllPermissions(Set<AdminPermission> allPermissions);
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 }

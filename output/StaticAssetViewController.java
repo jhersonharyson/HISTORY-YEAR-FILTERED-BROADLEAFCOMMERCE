@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,18 +19,22 @@ package org.broadleafcommerce.cms.web.file;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.broadleafcommerce.cms.common.AssetNotFoundException;
 import org.broadleafcommerce.cms.file.service.StaticAssetStorageService;
-import org.broadleafcommerce.common.sandbox.dao.SandBoxDao;
 import org.broadleafcommerce.common.sandbox.domain.SandBox;
+import org.broadleafcommerce.common.site.domain.Site;
+import org.broadleafcommerce.common.web.BroadleafSandBoxResolver;
+import org.broadleafcommerce.common.web.BroadleafSiteResolver;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.mvc.AbstractController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * Created by jfischer
@@ -38,16 +42,18 @@ import java.util.Map;
 public class StaticAssetViewController extends AbstractController {
 
     private static final Log LOG = LogFactory.getLog(StaticAssetViewController.class);
-    private static final String SANDBOX_ADMIN_ID_VAR = "blAdminCurrentSandboxId";
-    private static final String SANDBOX_ID_VAR = "blSandboxId";
-    private String assetServerUrlPrefix;
-    private String viewResolverName;
+    
+    protected String assetServerUrlPrefix;
+    protected String viewResolverName;
 
     @Resource(name="blStaticAssetStorageService")
     protected StaticAssetStorageService staticAssetStorageService;
 
-    @Resource(name="blSandBoxDao")
-    protected SandBoxDao sandBoxDao;
+    @Resource(name = "blSiteResolver")
+    protected BroadleafSiteResolver siteResolver;
+    
+    @Resource(name = "blSandBoxResolver")
+    protected BroadleafSandBoxResolver sandboxResolver;
 
     protected Map<String, String> convertParameterMap(Map<String, String[]> parameterMap) {
         Map<String, String> convertedMap = new LinkedHashMap<String, String>(parameterMap.size());
@@ -75,24 +81,23 @@ public class StaticAssetViewController extends AbstractController {
         String fullUrl = removeAssetPrefix(request.getRequestURI());
 
         try {
-           Long sandBoxId = (Long) request.getSession().getAttribute(SANDBOX_ID_VAR);
-           if (sandBoxId == null) {
-               sandBoxId = (Long) request.getSession().getAttribute(SANDBOX_ADMIN_ID_VAR);
-           }
-           SandBox sandBox = null;
-           if (sandBoxId != null) {
-               sandBox = sandBoxDao.retrieve(sandBoxId);
-           }
-           Map<String, String> model = staticAssetStorageService.getCacheFileModel(fullUrl, sandBox, convertParameterMap(request.getParameterMap()));
-    
-           return new ModelAndView(viewResolverName, model);
-       } catch (Exception e) {
-           LOG.error("Unable to retrieve static asset", e);
-           throw new RuntimeException(e);
-       }        
+            Site site = siteResolver.resolveSite(new ServletWebRequest(request, response));
+            SandBox sandBox = sandboxResolver.resolveSandBox(new ServletWebRequest(request, response), site);
+
+            try {
+                Map<String, String> model = staticAssetStorageService.getCacheFileModel(fullUrl, sandBox, convertParameterMap(request.getParameterMap()));
+                return new ModelAndView(viewResolverName, model);
+            } catch (AssetNotFoundException e) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                return null;
+            }
+        } catch (Exception e) {
+            LOG.error("Unable to retrieve static asset", e);
+            throw new RuntimeException(e);
+        }        
     }
     
-    private String removeAssetPrefix(String requestURI) {
+    protected String removeAssetPrefix(String requestURI) {
         String fileName = requestURI;
         if (assetServerUrlPrefix != null) {
             int pos = fileName.indexOf(assetServerUrlPrefix);

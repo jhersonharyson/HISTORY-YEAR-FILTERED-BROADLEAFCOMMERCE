@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ * Copyright 2008-2013 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *        http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 package org.broadleafcommerce.openadmin.server.dao;
 
 import org.broadleafcommerce.common.persistence.IdOverrideTableGenerator;
+import org.broadleafcommerce.common.util.dao.DynamicDaoHelperImpl;
 import org.broadleafcommerce.openadmin.server.service.DynamicEntityRemoteService;
 import org.hibernate.SessionFactory;
 import org.hibernate.SessionFactoryObserver;
@@ -39,9 +40,9 @@ public class SessionFactoryChangeListener implements SessionFactoryObserver {
 
     @Override
     public void sessionFactoryCreated(SessionFactory factory) {
-        synchronized (DynamicEntityDaoImpl.LOCK_OBJECT) {
+        synchronized (DynamicDaoHelperImpl.LOCK_OBJECT) {
             DynamicEntityDaoImpl.METADATA_CACHE.clear();
-            DynamicEntityDaoImpl.POLYMORPHIC_ENTITY_CACHE.clear();
+            DynamicDaoHelperImpl.POLYMORPHIC_ENTITY_CACHE.clear();
             try {
                 Field metadataCache = DynamicEntityRemoteService.class.getDeclaredField("METADATA_CACHE");
                 metadataCache.setAccessible(true);
