@@ -1,23 +1,27 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.file.domain;
 
 import org.broadleafcommerce.cms.field.type.StorageType;
 import org.broadleafcommerce.cms.file.service.StaticAssetService;
+import org.broadleafcommerce.common.copy.MultiTenantCloneable;
 import org.broadleafcommerce.common.sandbox.domain.SandBox;
 import org.broadleafcommerce.common.site.domain.Site;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
@@ -28,7 +32,7 @@ import java.util.Map;
 /**
  * Created by bpolster.
  */
-public interface StaticAsset extends Serializable {
+public interface StaticAsset extends Serializable, MultiTenantCloneable<StaticAsset> {
 
     /**
      * Returns the id of the static asset.
@@ -157,46 +161,8 @@ public interface StaticAsset extends Serializable {
      */
     public void setStorageType(StorageType storageType);
 
-    /**
-     * @deprecated - not currently used
-     * @return
-     */
-    public Site getSite();
-
-    /**
-     * @deprecated - not currently used
-     * @param site
-     */
-    public void setSite(Site site);
-
-    public SandBox getOriginalSandBox();
-
-    public void setOriginalSandBox(SandBox originalSandBox);
-
     public AdminAuditable getAuditable();
 
     public void setAuditable(AdminAuditable auditable);
-
-    public Boolean getLockedFlag();
-
-    public void setLockedFlag(Boolean lockedFlag);
-
-    public Boolean getDeletedFlag();
-
-    public void setDeletedFlag(Boolean deletedFlag);
-
-    public Boolean getArchivedFlag();
-
-    public void setArchivedFlag(Boolean archivedFlag);
-
-    public Long getOriginalAssetId();
-
-    public void setOriginalAssetId(Long originalPageId);
-
-    public SandBox getSandbox();
-
-    public void setSandbox(SandBox sandbox);
-
-    public StaticAsset cloneEntity();
 
 }

@@ -1,25 +1,23 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.dao.provider.metadata;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -52,6 +50,11 @@ import org.broadleafcommerce.openadmin.server.dao.provider.metadata.request.Over
 import org.broadleafcommerce.openadmin.server.service.type.FieldProviderResponse;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Jeff Fischer
@@ -158,7 +161,7 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
 
     @Override
     public FieldProviderResponse overrideViaXml(OverrideViaXmlRequest overrideViaXmlRequest, Map<String, FieldMetadata> metadata) {
-        Map<String, FieldMetadataOverride> overrides = getTargetedOverride(overrideViaXmlRequest.getRequestedConfigKey(), overrideViaXmlRequest.getRequestedCeilingEntity());
+        Map<String, FieldMetadataOverride> overrides = getTargetedOverride(overrideViaXmlRequest.getDynamicEntityDao(), overrideViaXmlRequest.getRequestedConfigKey(), overrideViaXmlRequest.getRequestedCeilingEntity());
         if (overrides != null) {
             for (String propertyName : overrides.keySet()) {
                 final FieldMetadataOverride localMetadata = overrides.get(propertyName);
@@ -374,6 +377,7 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
             override.setMapKeyOptionEntityDisplayField(map.mapKeyOptionEntityDisplayField());
             override.setMapKeyOptionEntityValueField(map.mapKeyOptionEntityValueField());
             override.setMediaField(map.mediaField());
+            override.setToOneTargetProperty(map.toOneTargetProperty());
             override.setSimpleValue(map.isSimpleValue());
             override.setValueClass(map.valueClass().getName());
             override.setValuePropertyFriendlyName(map.valuePropertyFriendlyName());
@@ -519,6 +523,12 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
         if (map.getMediaField() != null) {
             metadata.setMediaField(map.getMediaField());
         }
+        if (map.getToOneTargetProperty() != null) {
+            metadata.setToOneTargetProperty(map.getToOneTargetProperty());
+        }
+        if (map.getToOneParentProperty() != null) {
+            metadata.setToOneParentProperty((map.getToOneParentProperty()));
+        }
 
         if (map.getValueClass() != null && !void.class.getName().equals(map.getValueClass())) {
             metadata.setValueClassName(map.getValueClass());
@@ -571,9 +581,7 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
             metadata.setKeys(map.getKeys());
         }
         
-        if (map.getMapKeyValueProperty() != null) {
-            metadata.setMapKeyValueProperty(map.getMapKeyValueProperty());
-        }
+        metadata.setMapKeyValueProperty(mapKeyValueProperty);
 
         if (map.getMapKeyOptionEntityClass()!=null) {
             if (!void.class.getName().equals(map.getMapKeyOptionEntityClass())) {

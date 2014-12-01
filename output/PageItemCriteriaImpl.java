@@ -1,21 +1,30 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.page.domain;
 
+import org.broadleafcommerce.common.copy.CreateResponse;
+import org.broadleafcommerce.common.copy.MultiTenantCopyContext;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransform;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformMember;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformTypes;
+import org.broadleafcommerce.common.extensibility.jpa.copy.ProfileEntity;
 import org.broadleafcommerce.common.presentation.AdminPresentation;
 import org.broadleafcommerce.common.presentation.AdminPresentationClass;
 import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
@@ -44,6 +53,11 @@ import javax.persistence.Table;
 @Table(name = "BLC_PAGE_ITEM_CRITERIA")
 @Inheritance(strategy=InheritanceType.JOINED)
 @AdminPresentationClass(friendlyName = "PageItemCriteriaImpl_basePageItemCriteria")
+@DirectCopyTransform({
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.SANDBOX, skipOverlaps = true),
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE)
+})
+@ProfileEntity
 public class PageItemCriteriaImpl implements PageItemCriteria {
     
     public static final long serialVersionUID = 1L;
@@ -132,7 +146,7 @@ public class PageItemCriteriaImpl implements PageItemCriteria {
             return true;
         if (obj == null)
             return false;
-        if (getClass() != obj.getClass())
+        if (!getClass().isAssignableFrom(obj.getClass()))
             return false;
         PageItemCriteriaImpl other = (PageItemCriteriaImpl) obj;
         
@@ -162,4 +176,16 @@ public class PageItemCriteriaImpl implements PageItemCriteria {
         return newField;
     }
 
+    @Override
+    public <G extends PageItemCriteria> CreateResponse<G> createOrRetrieveCopyInstance(MultiTenantCopyContext context) throws CloneNotSupportedException {
+        CreateResponse<G> createResponse = context.createOrRetrieveCopyInstance(this);
+        if (createResponse.isAlreadyPopulated()) {
+            return createResponse;
+        }
+        PageItemCriteria cloned = createResponse.getClone();
+        cloned.setPage(page);
+        cloned.setMatchRule(orderItemMatchRule);
+        cloned.setQuantity(quantity);
+        return createResponse;
+    }
 }

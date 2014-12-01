@@ -1,21 +1,32 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.structure.domain;
 
+import org.broadleafcommerce.common.copy.CreateResponse;
+import org.broadleafcommerce.common.copy.MultiTenantCopyContext;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransform;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformMember;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformTypes;
+import org.broadleafcommerce.common.extensibility.jpa.copy.ProfileEntity;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
 import org.hibernate.annotations.Type;
@@ -38,6 +49,11 @@ import javax.persistence.Table;
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_SC_RULE")
+@DirectCopyTransform({
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.SANDBOX, skipOverlaps=true)
+})
+@ProfileEntity
+@Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
 public class StructuredContentRuleImpl implements StructuredContentRule {
 
     private static final long serialVersionUID = 1L;
@@ -60,33 +76,21 @@ public class StructuredContentRuleImpl implements StructuredContentRule {
     @Column(name = "MATCH_RULE", length = Integer.MAX_VALUE - 1)
     protected String matchRule;
 
-    /* (non-Javadoc)
-     * @see org.broadleafcommerce.core.offer.domain.StructuredContentRule#getId()
-     */
     @Override
     public Long getId() {
         return id;
     }
 
-    /* (non-Javadoc)
-     * @see org.broadleafcommerce.core.offer.domain.StructuredContentRule#setId(java.lang.Long)
-     */
     @Override
     public void setId(Long id) {
         this.id = id;
     }
 
-    /* (non-Javadoc)
-     * @see org.broadleafcommerce.core.offer.domain.StructuredContentRule#getMatchRule()
-     */
     @Override
     public String getMatchRule() {
         return matchRule;
     }
 
-    /* (non-Javadoc)
-     * @see org.broadleafcommerce.core.offer.domain.StructuredContentRule#setMatchRule(java.lang.String)
-     */
     @Override
     public void setMatchRule(String matchRule) {
         this.matchRule = matchRule;
@@ -107,7 +111,7 @@ public class StructuredContentRuleImpl implements StructuredContentRule {
             return true;
         if (obj == null)
             return false;
-        if (getClass() != obj.getClass())
+        if (!getClass().isAssignableFrom(obj.getClass()))
             return false;
         StructuredContentRuleImpl other = (StructuredContentRuleImpl) obj;
         
@@ -129,5 +133,16 @@ public class StructuredContentRuleImpl implements StructuredContentRule {
         newField.matchRule = matchRule;
 
         return newField;
+    }
+
+    @Override
+    public <G extends StructuredContentRule> CreateResponse<G> createOrRetrieveCopyInstance(MultiTenantCopyContext context) throws CloneNotSupportedException {
+        CreateResponse<G> createResponse = context.createOrRetrieveCopyInstance(this);
+        if (createResponse.isAlreadyPopulated()) {
+            return createResponse;
+        }
+        StructuredContentRule cloned = createResponse.getClone();
+        cloned.setMatchRule(matchRule);
+        return  createResponse;
     }
 }

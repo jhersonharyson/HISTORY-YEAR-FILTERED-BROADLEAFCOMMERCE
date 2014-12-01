@@ -1,30 +1,34 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.security.domain;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.admin.domain.AdminMainEntity;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransform;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformMember;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformTypes;
 import org.broadleafcommerce.common.presentation.AdminPresentation;
 import org.broadleafcommerce.common.presentation.AdminPresentationClass;
 import org.broadleafcommerce.common.presentation.AdminPresentationCollection;
 import org.broadleafcommerce.common.presentation.AdminPresentationOperationTypes;
-import org.broadleafcommerce.common.presentation.ConfigurationItem;
-import org.broadleafcommerce.common.presentation.ValidationConfiguration;
 import org.broadleafcommerce.common.presentation.client.AddMethodType;
 import org.broadleafcommerce.common.presentation.client.OperationType;
 import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
@@ -60,6 +64,9 @@ import javax.persistence.Table;
 @Table(name = "BLC_ADMIN_ROLE")
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blStandardElements")
 @AdminPresentationClass(friendlyName = "AdminRoleImpl_baseAdminRole")
+@DirectCopyTransform({
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_ADMINROLE)
+})
 public class AdminRoleImpl implements AdminRole, AdminMainEntity {
 
     private static final Log LOG = LogFactory.getLog(AdminRoleImpl.class);
@@ -80,12 +87,7 @@ public class AdminRoleImpl implements AdminRole, AdminMainEntity {
     protected Long id;
 
     @Column(name = "NAME", nullable=false)
-    @AdminPresentation(friendlyName = "AdminRoleImpl_Name", order = 1, group = "AdminRoleImpl_Role",
-            validationConfigurations = { @ValidationConfiguration(
-                    validationImplementation = "blRegexPropertyValidator",
-                    configurationItems = { @ConfigurationItem(itemName = "regularExpression", itemValue = "ROLE_.+"),
-                            @ConfigurationItem(itemName = ConfigurationItem.ERROR_MESSAGE, itemValue = "roleNameError") }
-                    ) })
+    @AdminPresentation(friendlyName = "AdminRoleImpl_Name", order = 1, group = "AdminRoleImpl_Role")
     protected String name;
 
     @Column(name = "DESCRIPTION", nullable=false)
@@ -103,7 +105,10 @@ public class AdminRoleImpl implements AdminRole, AdminMainEntity {
     @JoinTable(name = "BLC_ADMIN_ROLE_PERMISSION_XREF", joinColumns = @JoinColumn(name = "ADMIN_ROLE_ID", referencedColumnName = "ADMIN_ROLE_ID"), inverseJoinColumns = @JoinColumn(name = "ADMIN_PERMISSION_ID", referencedColumnName = "ADMIN_PERMISSION_ID"))
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blStandardElements")
     @BatchSize(size = 50)
-    @AdminPresentationCollection(addType = AddMethodType.LOOKUP, friendlyName = "permissionListTitle", manyToField = "allRoles",
+    @AdminPresentationCollection(addType = AddMethodType.LOOKUP,
+            friendlyName = "permissionListTitle",
+            manyToField = "allRoles",
+            customCriteria = "includeFriendlyOnly",
             operationTypes = @AdminPresentationOperationTypes(removeType = OperationType.NONDESTRUCTIVEREMOVE))
     protected Set<AdminPermission> allPermissions= new HashSet<AdminPermission>();
 

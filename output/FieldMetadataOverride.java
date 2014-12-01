@@ -1,19 +1,22 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.dto.override;
 
 import org.broadleafcommerce.common.presentation.client.AddMethodType;
@@ -109,6 +112,7 @@ public class FieldMetadataOverride {
     private String hint;
     private String lookupDisplayProperty;
     private Boolean forcePopulateChildProperties;
+    private Boolean enableTypeaheadLookup;
     private String optionListEntity;
     private String optionValueFieldName;
     private String optionDisplayFieldName;
@@ -429,6 +433,14 @@ public class FieldMetadataOverride {
     public void setForcePopulateChildProperties(Boolean forcePopulateChildProperties) {
         this.forcePopulateChildProperties = forcePopulateChildProperties;
     }
+    
+    public Boolean getEnableTypeaheadLookup() {
+        return enableTypeaheadLookup;
+    }
+
+    public void setEnableTypeaheadLookup(Boolean enableTypeaheadLookup) {
+        this.enableTypeaheadLookup = enableTypeaheadLookup;
+    }
 
     public Boolean getOptionCanEditValues() {
         return optionCanEditValues;
@@ -686,6 +698,8 @@ public class FieldMetadataOverride {
     private String mapKeyOptionEntityValueField;
     private String currencyCodeField;
     private Boolean forceFreeFormKeys;
+    private String toOneTargetProperty;
+    private String toOneParentProperty;
 
     public Boolean isDeleteEntityUponRemove() {
         return deleteEntityUponRemove;
@@ -758,6 +772,22 @@ public class FieldMetadataOverride {
 
     public void setMediaField(String mediaField) {
         this.mediaField = mediaField;
+    }
+
+    public String getToOneTargetProperty() {
+        return toOneTargetProperty;
+    }
+
+    public void setToOneTargetProperty(String toOneTargetProperty) {
+        this.toOneTargetProperty = toOneTargetProperty;
+    }
+
+    public String getToOneParentProperty() {
+        return toOneParentProperty;
+    }
+
+    public void setToOneParentProperty(String toOneParentProperty) {
+        this.toOneParentProperty = toOneParentProperty;
     }
 
     public String getValueClass() {

@@ -1,21 +1,31 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.page.domain;
 
+import org.broadleafcommerce.common.copy.CreateResponse;
+import org.broadleafcommerce.common.copy.MultiTenantCopyContext;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransform;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformMember;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformTypes;
+import org.broadleafcommerce.common.extensibility.jpa.copy.ProfileEntity;
+import org.broadleafcommerce.common.i18n.service.DynamicTranslationProvider;
 import org.broadleafcommerce.common.presentation.AdminPresentation;
 import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
@@ -23,6 +33,7 @@ import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
 import org.hibernate.annotations.Type;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Embedded;
 import javax.persistence.Entity;
@@ -43,6 +54,11 @@ import javax.persistence.Table;
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_PAGE_FLD")
 @EntityListeners(value = { AdminAuditableListener.class })
+@DirectCopyTransform({
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.SANDBOX, skipOverlaps=true),
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE, skipOverlaps=true)
+})
+@ProfileEntity
 public class PageFieldImpl implements PageField {
 
     private static final long serialVersionUID = 1L;
@@ -67,10 +83,6 @@ public class PageFieldImpl implements PageField {
     @Column (name = "FLD_KEY")
     protected String fieldKey;
 
-    @ManyToOne(targetEntity = PageImpl.class)
-    @JoinColumn(name="PAGE_ID")
-    protected Page page;
-
     @Column (name = "VALUE")
     protected String stringValue;
 
@@ -78,6 +90,10 @@ public class PageFieldImpl implements PageField {
     @Lob
     @Type(type = "org.hibernate.type.StringClobType")
     protected String lobValue;
+
+    @ManyToOne(targetEntity = PageImpl.class, optional = false, cascade = CascadeType.REFRESH)
+    @JoinColumn(name = "PAGE_ID")
+    protected Page page;
 
     @Override
     public Long getId() {
@@ -100,21 +116,11 @@ public class PageFieldImpl implements PageField {
     }
 
     @Override
-    public Page getPage() {
-        return page;
-    }
-
-    @Override
-    public void setPage(Page page) {
-        this.page = page;
-    }
-
-    @Override
     public String getValue() {
         if (stringValue != null && stringValue.length() > 0) {
-            return stringValue;
+            return DynamicTranslationProvider.getValue(page, "pageTemplate|" + fieldKey, stringValue);
         } else {
-            return lobValue;
+            return DynamicTranslationProvider.getValue(page, "pageTemplate|" + fieldKey, lobValue);
         }
     }
 
@@ -145,13 +151,34 @@ public class PageFieldImpl implements PageField {
     }
 
     @Override
-    public PageField cloneEntity() {
-        PageFieldImpl newPageField = new PageFieldImpl();
-        newPageField.fieldKey = fieldKey;
-        newPageField.page = page;
-        newPageField.lobValue = lobValue;
-        newPageField.stringValue = stringValue;
-        return newPageField;
+    public Page getPage() {
+        return page;
+    }
+
+    @Override
+    public void setPage(Page page) {
+        this.page = page;
+    }
+
+    @Override
+    public <G extends PageField> CreateResponse<G> createOrRetrieveCopyInstance(MultiTenantCopyContext context) throws CloneNotSupportedException {
+
+        CreateResponse<G> createResponse = context.createOrRetrieveCopyInstance(this);
+        if (createResponse.isAlreadyPopulated()) {
+            return createResponse;
+        }
+        PageField cloned = createResponse.getClone();
+        if (page != null) {
+            cloned.setPage(page.createOrRetrieveCopyInstance(context).getClone());
+        }
+        cloned.setFieldKey(fieldKey);
+        //we don't want to engage the dynamic behavior housed in the getter/setter methods for these fields
+        ((PageFieldImpl) cloned).stringValue = stringValue;
+        ((PageFieldImpl) cloned).lobValue = lobValue;
+
+        return createResponse;
+
+
     }
 }
 

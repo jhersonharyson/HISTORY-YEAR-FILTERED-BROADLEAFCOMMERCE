@@ -1,19 +1,22 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.dto;
 
 import org.broadleafcommerce.common.presentation.client.LookupType;
@@ -69,6 +72,7 @@ public class BasicFieldMetadata extends FieldMetadata {
     protected String hint;
     protected String lookupDisplayProperty;
     protected Boolean forcePopulateChildProperties;
+    protected Boolean enableTypeaheadLookup;
     protected String optionListEntity;
     protected String optionValueFieldName;
     protected String optionDisplayFieldName;
@@ -85,6 +89,9 @@ public class BasicFieldMetadata extends FieldMetadata {
     protected String mapFieldValueClass;
     protected Boolean searchable;
     protected String manyToField;
+    protected String toOneTargetProperty;
+    protected String toOneParentProperty;
+    protected String mapKeyValueProperty;
 
     public SupportedFieldType getFieldType() {
         return fieldType;
@@ -111,6 +118,9 @@ public class BasicFieldMetadata extends FieldMetadata {
     }
 
     public Boolean getRequired() {
+        if (required == null) {
+            return false;
+        }
         return required;
     }
 
@@ -167,7 +177,7 @@ public class BasicFieldMetadata extends FieldMetadata {
     }
 
     public Boolean getForeignKeyCollection() {
-        return foreignKeyCollection;
+        return foreignKeyCollection == null ? false : foreignKeyCollection;
     }
 
     public void setForeignKeyCollection(Boolean foreignKeyCollection) {
@@ -369,6 +379,13 @@ public class BasicFieldMetadata extends FieldMetadata {
     public void setForcePopulateChildProperties(Boolean forcePopulateChildProperties) {
         this.forcePopulateChildProperties = forcePopulateChildProperties;
     }
+    public Boolean getEnableTypeaheadLookup() {
+        return enableTypeaheadLookup;
+    }
+    
+    public void setEnableTypeaheadLookup(Boolean enableTypeaheadLookup) {
+        this.enableTypeaheadLookup = enableTypeaheadLookup;
+    }
 
     public Boolean getOptionCanEditValues() {
         return optionCanEditValues;
@@ -470,6 +487,30 @@ public class BasicFieldMetadata extends FieldMetadata {
         this.manyToField = manyToField;
     }
 
+    public String getToOneTargetProperty() {
+        return toOneTargetProperty;
+    }
+
+    public void setToOneTargetProperty(String toOneTargetProperty) {
+        this.toOneTargetProperty = toOneTargetProperty;
+    }
+
+    public String getToOneParentProperty() {
+        return toOneParentProperty;
+    }
+
+    public void setToOneParentProperty(String toOneParentProperty) {
+        this.toOneParentProperty = toOneParentProperty;
+    }
+
+    public String getMapKeyValueProperty() {
+        return mapKeyValueProperty;
+    }
+
+    public void setMapKeyValueProperty(String mapKeyValueProperty) {
+        this.mapKeyValueProperty = mapKeyValueProperty;
+    }
+
     public void setLookupType(LookupType lookupType) {
         this.lookupType = lookupType;
     }
@@ -534,6 +575,7 @@ public class BasicFieldMetadata extends FieldMetadata {
         }
         metadata.lookupDisplayProperty = lookupDisplayProperty;
         metadata.forcePopulateChildProperties = forcePopulateChildProperties;
+        metadata.enableTypeaheadLookup = enableTypeaheadLookup;
         metadata.optionListEntity = optionListEntity;
         metadata.optionCanEditValues = optionCanEditValues;
         metadata.optionDisplayFieldName = optionDisplayFieldName;
@@ -552,6 +594,9 @@ public class BasicFieldMetadata extends FieldMetadata {
         metadata.mapFieldValueClass = mapFieldValueClass;
         metadata.searchable = searchable;
         metadata.manyToField = manyToField;
+        metadata.toOneTargetProperty = toOneTargetProperty;
+        metadata.toOneParentProperty = toOneParentProperty;
+        metadata.mapKeyValueProperty = mapKeyValueProperty;
         metadata.lookupType = lookupType;
         metadata.translatable = translatable;
         metadata.isDerived = isDerived;
@@ -571,7 +616,10 @@ public class BasicFieldMetadata extends FieldMetadata {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof BasicFieldMetadata)) {
+        if (o == null) {
+            return false;
+        }
+        if (!getClass().isAssignableFrom(o.getClass())) {
             return false;
         }
         if (!super.equals(o)) {
@@ -632,6 +680,9 @@ public class BasicFieldMetadata extends FieldMetadata {
             return false;
         }
         if (forcePopulateChildProperties != null ? !forcePopulateChildProperties.equals(metadata.forcePopulateChildProperties) : metadata.forcePopulateChildProperties != null) {
+            return false;
+        }
+        if (enableTypeaheadLookup != null ? !enableTypeaheadLookup.equals(metadata.enableTypeaheadLookup) : metadata.enableTypeaheadLookup != null) {
             return false;
         }
         if (mergedPropertyType != metadata.mergedPropertyType) {
@@ -703,6 +754,15 @@ public class BasicFieldMetadata extends FieldMetadata {
         if (manyToField != null ? !manyToField.equals(metadata.manyToField) : metadata.manyToField != null) {
             return false;
         }
+        if (toOneTargetProperty != null ? !toOneTargetProperty.equals(metadata.toOneTargetProperty) : metadata.toOneTargetProperty != null) {
+            return false;
+        }
+        if (toOneParentProperty != null ? !toOneParentProperty.equals(metadata.toOneParentProperty) : metadata.toOneParentProperty != null) {
+            return false;
+        }
+        if (mapKeyValueProperty != null ? !mapKeyValueProperty.equals(metadata.mapKeyValueProperty) : metadata.mapKeyValueProperty != null) {
+            return false;
+        }
         if (lookupType != null ? !lookupType.equals(metadata.lookupType) : metadata.lookupType != null) {
             return false;
         }
@@ -749,6 +809,7 @@ public class BasicFieldMetadata extends FieldMetadata {
         result = 31 * result + (hint != null ? hint.hashCode() : 0);
         result = 31 * result + (lookupDisplayProperty != null ? lookupDisplayProperty.hashCode() : 0);
         result = 31 * result + (forcePopulateChildProperties != null ? forcePopulateChildProperties.hashCode() : 0);
+        result = 31 * result + (enableTypeaheadLookup != null ? enableTypeaheadLookup.hashCode() : 0);
         result = 31 * result + (optionListEntity != null ? optionListEntity.hashCode() : 0);
         result = 31 * result + (optionValueFieldName != null ? optionValueFieldName.hashCode() : 0);
         result = 31 * result + (optionDisplayFieldName != null ? optionDisplayFieldName.hashCode() : 0);
@@ -757,6 +818,9 @@ public class BasicFieldMetadata extends FieldMetadata {
         result = 31 * result + (mapFieldValueClass != null ? mapFieldValueClass.hashCode() : 0);
         result = 31 * result + (searchable != null ? searchable.hashCode() : 0);
         result = 31 * result + (manyToField != null ? manyToField.hashCode() : 0);
+        result = 31 * result + (toOneTargetProperty != null ? toOneTargetProperty.hashCode() : 0);
+        result = 31 * result + (toOneParentProperty != null ? toOneParentProperty.hashCode() : 0);
+        result = 31 * result + (mapKeyValueProperty != null ? mapKeyValueProperty.hashCode() : 0);
         result = 31 * result + (lookupType != null ? lookupType.hashCode() : 0);
         result = 31 * result + (isDerived != null ? isDerived.hashCode() : 0);
         return result;

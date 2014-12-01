@@ -1,21 +1,25 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.dto;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.broadleafcommerce.common.util.BLCMapUtils;
 import org.broadleafcommerce.common.util.TypedClosure;
@@ -24,6 +28,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,15 +48,14 @@ public class Entity implements Serializable {
     protected String[] type;
     protected Property[] properties;
     protected boolean isDirty = false;
+    protected Date deployDate;
     protected Boolean isDeleted = false;
     protected Boolean isInactive = false;
     protected Boolean isActive = false;
-    protected Boolean isLocked = false;
-    protected String lockedBy;
-    protected String lockedDate;
     protected boolean multiPartAvailableOnThread = false;
     protected boolean isValidationFailure = false;
     protected Map<String, List<String>> validationErrors = new HashMap<String, List<String>>();
+    protected List<String> globalValidationErrors = new ArrayList<String>();
     
     protected Map<String, Property> pMap = null;
 
@@ -154,13 +158,38 @@ public class Entity implements Serializable {
     }
     
     public void addProperty(Property property) {
+        boolean exists = findProperty(property.getName()) != null;
         Property[] allProps = getProperties();
-        Property[] newProps = new Property[allProps.length + 1];
+        Property[] newProps = new Property[exists?allProps.length:allProps.length + 1];
+        int count = 0;
         for (int j=0;j<allProps.length;j++) {
-            newProps[j] = allProps[j];
+            if (!allProps[j].getName().equals(property.getName())) {
+                newProps[count] = allProps[j];
+                count++;
+            }
         }
         newProps[newProps.length - 1] = property;
         setProperties(newProps);
+    }
+
+    public Property removeProperty(String name) {
+        boolean exists = findProperty(name) != null;
+        Property response = null;
+        if (exists) {
+            Property[] allProps = getProperties();
+            Property[] newProps = new Property[allProps.length - 1];
+            int count = 0;
+            for (int j = 0; j < allProps.length; j++) {
+                if (!allProps[j].getName().equals(name)) {
+                    newProps[count] = allProps[j];
+                    count++;
+                } else {
+                    response = allProps[j];
+                }
+            }
+            setProperties(newProps);
+        }
+        return response;
     }
 
     /**
@@ -174,7 +203,7 @@ public class Entity implements Serializable {
      * property in messages.properties to support different locales
      */
     public void addValidationError(String fieldName, String errorOrErrorKey) {
-        Map<String, List<String>> fieldErrors = getValidationErrors();
+        Map<String, List<String>> fieldErrors = getPropertyValidationErrors();
         List<String> errorMessages = fieldErrors.get(fieldName);
         if (errorMessages == null) {
             errorMessages = new ArrayList<String>();
@@ -202,11 +231,11 @@ public class Entity implements Serializable {
 
     /**
      * 
-     * @return if this entity has failed validation. This will also check the {@link #getValidationErrors()} map if this
-     * boolean has not been explicitly set
+     * @return if this entity has failed validation. This will also check the {@link #getPropertyValidationErrors()} map and 
+     * {@link #getGlobalValidationErrors()} if this boolean has not been explicitly set
      */
     public boolean isValidationFailure() {
-        if (!getValidationErrors().isEmpty()) {
+        if (MapUtils.isNotEmpty(getPropertyValidationErrors()) || CollectionUtils.isNotEmpty(getGlobalValidationErrors())) {
             isValidationFailure = true;
         }
         return isValidationFailure;
@@ -216,6 +245,15 @@ public class Entity implements Serializable {
         isValidationFailure = validationFailure;
     }
 
+    /**
+     * @deprecated use {@link #getPropertyValidationErrors()} instead
+     * @return
+     */
+    @Deprecated
+    public Map<String, List<String>> getValidationErrors() {
+        return getPropertyValidationErrors();
+    }
+    
     /**
      * Validation error map where the key corresponds to the property that failed validation (which could be dot-separated)
      * and the value corresponds to a list of the error messages, in the case of multiple errors on the same field.
@@ -227,10 +265,18 @@ public class Entity implements Serializable {
      * 
      * @return a map keyed by property name to the list of error messages for that property
      */
-    public Map<String, List<String>> getValidationErrors() {
+    public Map<String, List<String>> getPropertyValidationErrors() {
         return validationErrors;
     }
 
+    /**
+     * @deprecated use {@link #setPropertyValidationErrors(Map)} instead
+     */
+    @Deprecated
+    public void setValidationErrors(Map<String, List<String>> validationErrors) {
+        setPropertyValidationErrors(validationErrors);
+    }
+    
     /**
      * Completely reset the validation errors for this Entity. In most cases it is more appropriate to use the convenience
      * method for adding a single error via {@link #addValidationError(String, String)}. This will also set the entire
@@ -239,11 +285,38 @@ public class Entity implements Serializable {
      * @param validationErrors
      * @see #addValidationError(String, String)
      */
-    public void setValidationErrors(Map<String, List<String>> validationErrors) {
+    public void setPropertyValidationErrors(Map<String, List<String>> validationErrors) {
         if (MapUtils.isNotEmpty(validationErrors)) {
             setValidationFailure(true);
         }
         this.validationErrors = validationErrors;
+    }
+    
+    /**
+     * Adds a validation error to this entity that is not tied to any specific property. If you need to tie this to a
+     * property then you should use {@link #addValidationError(String, String)} instead.
+     * @param errorOrErrorKey
+     */
+    public void addGlobalValidationError(String errorOrErrorKey) {
+        setValidationFailure(true);
+        globalValidationErrors.add(errorOrErrorKey);
+    }
+    
+    /**
+     * Similar to {@link #addGlobalValidationError(String)} except with a list of errors
+     * @param errorOrErrorKeys
+     */
+    public void addGlobalValidationErrors(List<String> errorOrErrorKeys) {
+        setValidationFailure(true);
+        globalValidationErrors.addAll(errorOrErrorKeys);
+    }
+    
+    public List<String> getGlobalValidationErrors() {
+        return globalValidationErrors;
+    }
+    
+    public void setGlobalValidationErrors(List<String> globalValidationErrors) {
+        this.globalValidationErrors = globalValidationErrors;
     }
 
     public Boolean getActive() {
@@ -270,48 +343,46 @@ public class Entity implements Serializable {
         isInactive = inactive;
     }
 
-    public Boolean getLocked() {
-        return isLocked;
+    public Date getDeployDate() {
+        return deployDate;
     }
 
-    public void setLocked(Boolean locked) {
-        isLocked = locked;
+    public void setDeployDate(Date deployDate) {
+        this.deployDate = deployDate;
     }
 
-    public String getLockedBy() {
-        return lockedBy;
-    }
-
-    public void setLockedBy(String lockedBy) {
-        this.lockedBy = lockedBy;
-    }
-
-    public String getLockedDate() {
-        return lockedDate;
-    }
-
-    public void setLockedDate(String lockedDate) {
-        this.lockedDate = lockedDate;
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("Entity{");
+        sb.append("isValidationFailure=").append(isValidationFailure);
+        sb.append(", isDirty=").append(isDirty);
+        sb.append(", properties=").append(Arrays.toString(properties));
+        sb.append(", type=").append(Arrays.toString(type));
+        sb.append('}');
+        return sb.toString();
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Entity)) return false;
+        if (o == null) return false;
+        if (!getClass().isAssignableFrom(o.getClass())) return false;
 
         Entity entity = (Entity) o;
 
         if (isDirty != entity.isDirty) return false;
         if (isValidationFailure != entity.isValidationFailure) return false;
         if (multiPartAvailableOnThread != entity.multiPartAvailableOnThread) return false;
+        if (deployDate != null ? !deployDate.equals(entity.deployDate) : entity.deployDate != null) return false;
         if (isActive != null ? !isActive.equals(entity.isActive) : entity.isActive != null) return false;
         if (isDeleted != null ? !isDeleted.equals(entity.isDeleted) : entity.isDeleted != null) return false;
         if (isInactive != null ? !isInactive.equals(entity.isInactive) : entity.isInactive != null) return false;
-        if (isLocked != null ? !isLocked.equals(entity.isLocked) : entity.isLocked != null) return false;
-        if (lockedBy != null ? !lockedBy.equals(entity.lockedBy) : entity.lockedBy != null) return false;
-        if (lockedDate != null ? !lockedDate.equals(entity.lockedDate) : entity.lockedDate != null) return false;
+        if (pMap != null ? !pMap.equals(entity.pMap) : entity.pMap != null) return false;
         if (!Arrays.equals(properties, entity.properties)) return false;
         if (!Arrays.equals(type, entity.type)) return false;
+        if (validationErrors != null ? !validationErrors.equals(entity.validationErrors) : entity.validationErrors !=
+                null)
+            return false;
 
         return true;
     }
@@ -321,14 +392,14 @@ public class Entity implements Serializable {
         int result = type != null ? Arrays.hashCode(type) : 0;
         result = 31 * result + (properties != null ? Arrays.hashCode(properties) : 0);
         result = 31 * result + (isDirty ? 1 : 0);
+        result = 31 * result + (deployDate != null ? deployDate.hashCode() : 0);
         result = 31 * result + (isDeleted != null ? isDeleted.hashCode() : 0);
         result = 31 * result + (isInactive != null ? isInactive.hashCode() : 0);
         result = 31 * result + (isActive != null ? isActive.hashCode() : 0);
-        result = 31 * result + (isLocked != null ? isLocked.hashCode() : 0);
-        result = 31 * result + (lockedBy != null ? lockedBy.hashCode() : 0);
-        result = 31 * result + (lockedDate != null ? lockedDate.hashCode() : 0);
         result = 31 * result + (multiPartAvailableOnThread ? 1 : 0);
         result = 31 * result + (isValidationFailure ? 1 : 0);
+        result = 31 * result + (validationErrors != null ? validationErrors.hashCode() : 0);
+        result = 31 * result + (pMap != null ? pMap.hashCode() : 0);
         return result;
     }
 }

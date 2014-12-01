@@ -1,24 +1,30 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Admin Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.admin.server.service;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.broadleafcommerce.admin.server.service.extension.AdminCatalogServiceExtensionManager;
+import org.broadleafcommerce.common.extension.ExtensionResultHolder;
+import org.broadleafcommerce.common.extension.ExtensionResultStatusType;
 import org.broadleafcommerce.common.util.BLCCollectionUtils;
 import org.broadleafcommerce.common.util.TypedTransformer;
 import org.broadleafcommerce.core.catalog.dao.SkuDao;
@@ -55,6 +61,9 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
 
     @PersistenceContext(unitName="blPU")
     protected EntityManager em;
+
+    @Resource(name = "blAdminCatalogServiceExtensionManager")
+    protected AdminCatalogServiceExtensionManager extensionManager;
     
     @Override
     public Integer generateSkusFromProduct(Long productId) {
@@ -92,23 +101,18 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
                 permutationsToGenerate.add(permutation);
             }
         }
+
         int numPermutationsCreated = 0;
-        //For each permutation, I need them to map to a specific Sku
-        for (List<ProductOptionValue> permutation : permutationsToGenerate) {
-            if (permutation.isEmpty()) continue;
-            Sku permutatedSku = catalogService.createSku();
-            permutatedSku.setProduct(product);
-            permutatedSku.setProductOptionValues(permutation);
-            permutatedSku = catalogService.saveSku(permutatedSku);
-            product.getAdditionalSkus().add(permutatedSku);
-            numPermutationsCreated++;
-        }
-        if (numPermutationsCreated != 0) {
-            catalogService.saveProduct(product);
+        if (extensionManager != null) {
+            ExtensionResultHolder<Integer> result = new ExtensionResultHolder<Integer>();
+            ExtensionResultStatusType resultStatusType = extensionManager.getProxy().persistSkuPermutation(product, permutationsToGenerate, result);
+            if (ExtensionResultStatusType.HANDLED == resultStatusType) {
+                numPermutationsCreated = result.getResult();
+            }
         }
         return numPermutationsCreated;
     }
-    
+
     protected boolean isSamePermutation(List<ProductOptionValue> perm1, List<ProductOptionValue> perm2) {
         if (perm1.size() == perm2.size()) {
             

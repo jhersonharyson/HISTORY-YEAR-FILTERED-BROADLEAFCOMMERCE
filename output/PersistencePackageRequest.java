@@ -1,29 +1,32 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.domain;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
+import org.broadleafcommerce.common.util.BLCArrayUtils;
 import org.broadleafcommerce.openadmin.dto.AdornedTargetCollectionMetadata;
 import org.broadleafcommerce.openadmin.dto.AdornedTargetList;
 import org.broadleafcommerce.openadmin.dto.BasicCollectionMetadata;
 import org.broadleafcommerce.openadmin.dto.BasicFieldMetadata;
-import org.broadleafcommerce.openadmin.dto.CollectionMetadata;
 import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.FieldMetadata;
 import org.broadleafcommerce.openadmin.dto.FilterAndSortCriteria;
@@ -31,10 +34,12 @@ import org.broadleafcommerce.openadmin.dto.ForeignKey;
 import org.broadleafcommerce.openadmin.dto.MapMetadata;
 import org.broadleafcommerce.openadmin.dto.MapStructure;
 import org.broadleafcommerce.openadmin.dto.OperationTypes;
+import org.broadleafcommerce.openadmin.dto.SectionCrumb;
 import org.broadleafcommerce.openadmin.dto.visitor.MetadataVisitor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +53,7 @@ public class PersistencePackageRequest {
 
     protected Type type;
     protected String ceilingEntityClassname;
+    protected String securityCeilingEntityClassname;
     protected String configKey;
     protected AdornedTargetList adornedList;
     protected MapStructure mapStructure;
@@ -55,8 +61,13 @@ public class PersistencePackageRequest {
     protected ForeignKey foreignKey;
     protected Integer startIndex;
     protected Integer maxIndex;
+    protected SectionCrumb[] sectionCrumbs;
+    protected String sectionEntityField;
+    protected String requestingEntityName;
+    protected String msg;
     protected Map<String, PersistencePackageRequest> subRequests = new LinkedHashMap<String, PersistencePackageRequest>();
     protected boolean validateUnsubmittedProperties = true;
+    protected boolean isUpdateLookupType = false;
 
     protected OperationTypes operationTypesOverride = null;
 
@@ -96,7 +107,7 @@ public class PersistencePackageRequest {
      * @param md
      * @return the newly created PersistencePackageRequest
      */
-    public static PersistencePackageRequest fromMetadata(FieldMetadata md) {
+    public static PersistencePackageRequest fromMetadata(FieldMetadata md, List<SectionCrumb> sectionCrumbs) {
         final PersistencePackageRequest request = new PersistencePackageRequest();
 
         md.accept(new MetadataVisitor() {
@@ -105,6 +116,7 @@ public class PersistencePackageRequest {
             public void visit(BasicFieldMetadata fmd) {
                 request.setType(Type.STANDARD);
                 request.setCeilingEntityClassname(fmd.getForeignKeyClass());
+                request.setCustomCriteria(fmd.getCustomCriteria());
             }
 
             @Override
@@ -116,6 +128,7 @@ public class PersistencePackageRequest {
                 request.setCeilingEntityClassname(fmd.getCollectionCeilingEntity());
                 request.setOperationTypesOverride(fmd.getPersistencePerspective().getOperationTypes());
                 request.setForeignKey(foreignKey);
+                request.setCustomCriteria(fmd.getCustomCriteria());
             }
 
             @Override
@@ -127,6 +140,7 @@ public class PersistencePackageRequest {
                 request.setCeilingEntityClassname(fmd.getCollectionCeilingEntity());
                 request.setOperationTypesOverride(fmd.getPersistencePerspective().getOperationTypes());
                 request.setAdornedList(adornedList);
+                request.setCustomCriteria(fmd.getCustomCriteria());
             }
 
             @Override
@@ -142,11 +156,12 @@ public class PersistencePackageRequest {
                 request.setOperationTypesOverride(fmd.getPersistencePerspective().getOperationTypes());
                 request.setMapStructure(mapStructure);
                 request.setForeignKey(foreignKey);
+                request.setCustomCriteria(fmd.getCustomCriteria());
             }
         });
         
-        if (md instanceof CollectionMetadata) {
-            request.setCustomCriteria(((CollectionMetadata) md).getCustomCriteria());
+        if (sectionCrumbs != null) {
+            request.setSectionCrumbs(sectionCrumbs.toArray(new SectionCrumb[sectionCrumbs.size()]));
         }
 
         return request;
@@ -175,6 +190,11 @@ public class PersistencePackageRequest {
 
     public PersistencePackageRequest withCeilingEntityClassname(String className) {
         setCeilingEntityClassname(className);
+        return this;
+    }
+
+    public PersistencePackageRequest withSecurityCeilingEntityClassname(String className) {
+        setSecurityCeilingEntityClassname(className);
         return this;
     }
 
@@ -227,6 +247,31 @@ public class PersistencePackageRequest {
         return this;
     }
 
+    public PersistencePackageRequest withSectionCrumbs(List<SectionCrumb> sectionCrumbs) {
+        setSectionCrumbs(sectionCrumbs.toArray(new SectionCrumb[sectionCrumbs.size()]));
+        return this;
+    }
+
+    public PersistencePackageRequest withSectionEntityField(String sectionEntityField) {
+        setSectionEntityField(sectionEntityField);
+        return this;
+    }
+    
+    public PersistencePackageRequest withRequestingEntityName(String requestingEntityName) {
+        setRequestingEntityName(requestingEntityName);
+        return this;
+    }
+
+    public PersistencePackageRequest withMsg(String msg) {
+        setMsg(msg);
+        return this;
+    }
+
+    public PersistencePackageRequest withIsUpdateLookupType(boolean isUpdateLookupType) {
+        setUpdateLookupType(isUpdateLookupType);
+        return this;
+    }
+
     /* *********** */
     /* ADD METHODS */
     /* *********** */
@@ -242,6 +287,10 @@ public class PersistencePackageRequest {
     }
 
     public PersistencePackageRequest addCustomCriteria(String customCriteria) {
+        if (this.customCriteria == null) {
+            this.customCriteria = new ArrayList<String>();
+        }
+        
         if (StringUtils.isNotBlank(customCriteria)) {
             this.customCriteria.add(customCriteria);
         }
@@ -265,6 +314,21 @@ public class PersistencePackageRequest {
         return this;
     }
 
+    /* ************** */
+    /* REMOVE METHODS */
+    /* ************** */
+    
+    public PersistencePackageRequest removeFilterAndSortCriteria(String name) {
+        Iterator<FilterAndSortCriteria> it = filterAndSortCriteria.listIterator();
+        while (it.hasNext()) {
+            FilterAndSortCriteria fasc = it.next();
+            if (fasc.getPropertyId().equals(name)) {
+                it.remove();
+            }
+        }
+        return this;
+    }
+
     /* ************************ */
     /* CUSTOM GETTERS / SETTERS */
     /* ************************ */
@@ -282,11 +346,15 @@ public class PersistencePackageRequest {
     }
     
     public void setAdditionalForeignKeys(ForeignKey[] additionalForeignKeys) {
-        this.additionalForeignKeys = Arrays.asList(additionalForeignKeys);
+        this.additionalForeignKeys.addAll(Arrays.asList(additionalForeignKeys));
     }
 
     public void setCustomCriteria(String[] customCriteria) {
-        this.customCriteria = Arrays.asList(customCriteria);
+        if (customCriteria == null || customCriteria.length == 0) {
+            this.customCriteria = new ArrayList<String>();
+        } else {
+            this.customCriteria = BLCArrayUtils.asList(customCriteria);
+        }
     }
 
     public FilterAndSortCriteria[] getFilterAndSortCriteria() {
@@ -319,6 +387,24 @@ public class PersistencePackageRequest {
         this.type = type;
     }
     
+    /**
+     * Returns the entity that should be checked for security purposes.   If no value is defined explicitly, returns the 
+     * value for {@link #getCeilingEntityClassname()}.
+     * 
+     * @return
+     */
+    public String getSecurityCeilingEntityClassname() {
+        if (securityCeilingEntityClassname != null) {
+            return securityCeilingEntityClassname;
+        } else {
+            return getCeilingEntityClassname();
+        }
+    }
+
+    public void setSecurityCeilingEntityClassname(String securityCeilingEntityClassname) {
+        this.securityCeilingEntityClassname = securityCeilingEntityClassname;
+    }
+
     public String getCeilingEntityClassname() {
         return ceilingEntityClassname;
     }
@@ -383,6 +469,38 @@ public class PersistencePackageRequest {
         this.maxIndex = maxIndex;
     }
 
+    public SectionCrumb[] getSectionCrumbs() {
+        return sectionCrumbs;
+    }
+
+    public void setSectionCrumbs(SectionCrumb[] sectionCrumbs) {
+        this.sectionCrumbs = sectionCrumbs;
+    }
+
+    public String getSectionEntityField() {
+        return sectionEntityField;
+    }
+
+    public void setSectionEntityField(String sectionEntityField) {
+        this.sectionEntityField = sectionEntityField;
+    }
+    
+    public String getRequestingEntityName() {
+        return requestingEntityName;
+    }
+    
+    public void setRequestingEntityName(String requestingEntityName) {
+        this.requestingEntityName = requestingEntityName;
+    }
+    
+    public String getMsg() {
+        return msg;
+    }
+
+    public void setMsg(String msg) {
+        this.msg = msg;
+    }
+
     public Map<String, PersistencePackageRequest> getSubRequests() {
         return subRequests;
     }
@@ -390,13 +508,20 @@ public class PersistencePackageRequest {
     public void setSubRequests(Map<String, PersistencePackageRequest> subRequests) {
         this.subRequests = subRequests;
     }
-
     public boolean isValidateUnsubmittedProperties() {
         return validateUnsubmittedProperties;
     }
 
     public void setValidateUnsubmittedProperties(boolean validateUnsubmittedProperties) {
         this.validateUnsubmittedProperties = validateUnsubmittedProperties;
+    }
+
+    public boolean isUpdateLookupType() {
+        return isUpdateLookupType;
+    }
+    
+    public void setUpdateLookupType(boolean isUpdateLookupType) {
+        this.isUpdateLookupType = isUpdateLookupType;
     }
     
 }

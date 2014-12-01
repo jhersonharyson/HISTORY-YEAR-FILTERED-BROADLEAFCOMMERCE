@@ -1,20 +1,37 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.file.dao;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.Resource;
+import javax.persistence.EntityManager;
+import javax.persistence.NoResultException;
+import javax.persistence.PersistenceContext;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Order;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
 
 import org.broadleafcommerce.cms.file.domain.StaticAsset;
 import org.broadleafcommerce.cms.file.domain.StaticAssetImpl;
@@ -24,17 +41,6 @@ import org.broadleafcommerce.common.sandbox.domain.SandBoxImpl;
 import org.hibernate.ejb.QueryHints;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
-
-import javax.annotation.Resource;
-import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
-import javax.persistence.PersistenceContext;
-import javax.persistence.TypedQuery;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Root;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Created by bpolster.
@@ -52,6 +58,9 @@ public class StaticAssetDaoImpl implements StaticAssetDao {
 
     @Resource(name="blEntityConfiguration")
     protected EntityConfiguration entityConfiguration;
+
+    @Resource(name = "blStaticAssetDaoQueryExtensionManager")
+    protected StaticAssetDaoQueryExtensionManager queryExtensionManager;
 
     @Override
     public StaticAsset readStaticAssetById(Long id) {
@@ -71,23 +80,37 @@ public class StaticAssetDaoImpl implements StaticAssetDao {
     }
 
     @Override
-    public StaticAsset readStaticAssetByFullUrl(String fullUrl, SandBox targetSandBox) {
-        TypedQuery<StaticAsset> query;
-        if (targetSandBox == null) {
-            query = em.createNamedQuery("BC_READ_STATIC_ASSET_BY_FULL_URL_AND_TARGET_SANDBOX_NULL", StaticAsset.class);
-            query.setParameter("fullUrl", fullUrl);
-        } else {
-            query = em.createNamedQuery("BC_READ_STATIC_ASSET_BY_FULL_URL", StaticAsset.class);
-            query.setParameter("targetSandbox", targetSandBox);
-            query.setParameter("fullUrl", fullUrl);
-        }
-        query.setHint(QueryHints.HINT_CACHEABLE, true);
+    public StaticAsset readStaticAssetByFullUrl(String fullUrl) {
+        CriteriaBuilder builder = em.getCriteriaBuilder();
+        CriteriaQuery<StaticAsset> criteria = builder.createQuery(StaticAsset.class);
+        Root<StaticAssetImpl> handler = criteria.from(StaticAssetImpl.class);
+        criteria.select(handler);
 
-        List<StaticAsset> results = query.getResultList();
-        if (CollectionUtils.isEmpty(results)) {
+        List<Predicate> restrictions = new ArrayList<Predicate>();
+        List<Order> sorts = new ArrayList<Order>();
+        restrictions.add(builder.equal(handler.get("fullUrl"), fullUrl));
+        try {
+            if (queryExtensionManager != null) {
+                queryExtensionManager.getProxy().setup(StaticAssetImpl.class, null);
+                queryExtensionManager.getProxy().refineRetrieve(StaticAssetImpl.class, null, builder, criteria, handler, restrictions);
+                queryExtensionManager.getProxy().refineOrder(StaticAssetImpl.class, null, builder, criteria, handler, sorts);
+            }
+            criteria.where(restrictions.toArray(new Predicate[restrictions.size()]));
+            if (!org.apache.commons.collections.CollectionUtils.isEmpty(sorts)) {
+                criteria.orderBy(sorts);
+            }
+
+            TypedQuery<StaticAsset> query = em.createQuery(criteria);
+            query.setHint(QueryHints.HINT_CACHEABLE, true);
+            List<StaticAsset> response = query.getResultList();
+            if (response.size() > 0) {
+                return response.get(0);
+            }
             return null;
-        } else {
-            return results.iterator().next();
+        } finally {
+            if (queryExtensionManager != null) {
+                queryExtensionManager.getProxy().breakdown(StaticAssetImpl.class, null);
+            }
         }
     }
 

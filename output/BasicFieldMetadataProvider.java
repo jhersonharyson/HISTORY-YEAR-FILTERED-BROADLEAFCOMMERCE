@@ -1,27 +1,23 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.dao.provider.metadata;
-
-import java.io.Serializable;
-import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -61,6 +57,13 @@ import org.hibernate.criterion.Restrictions;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author Jeff Fischer
@@ -198,7 +201,7 @@ public class BasicFieldMetadataProvider extends FieldMetadataProviderAdapter {
 
     @Override
     public FieldProviderResponse overrideViaXml(OverrideViaXmlRequest overrideViaXmlRequest, Map<String, FieldMetadata> metadata) {
-        Map<String, FieldMetadataOverride> overrides = getTargetedOverride(overrideViaXmlRequest.getRequestedConfigKey(), overrideViaXmlRequest.getRequestedCeilingEntity());
+        Map<String, FieldMetadataOverride> overrides = getTargetedOverride(overrideViaXmlRequest.getDynamicEntityDao(), overrideViaXmlRequest.getRequestedConfigKey(), overrideViaXmlRequest.getRequestedCeilingEntity());
         if (overrides != null) {
             for (String propertyName : overrides.keySet()) {
                 final FieldMetadataOverride localMetadata = overrides.get(propertyName);
@@ -253,6 +256,7 @@ public class BasicFieldMetadataProvider extends FieldMetadataProviderAdapter {
                 metadata.setExplicitFieldType(SupportedFieldType.ADDITIONAL_FOREIGN_KEY);
                 metadata.setLookupDisplayProperty(annot.lookupDisplayProperty());
                 metadata.setForcePopulateChildProperties(annot.forcePopulateChildProperties());
+                metadata.setEnableTypeaheadLookup(annot.enableTypeaheadLookup());
                 if (!StringUtils.isEmpty(annot.lookupDisplayProperty())) {
                     metadata.setForeignKeyDisplayValueProperty(annot.lookupDisplayProperty());
                 }
@@ -443,6 +447,9 @@ public class BasicFieldMetadataProvider extends FieldMetadataProviderAdapter {
             } else if (entry.getKey().equals(PropertyType.AdminPresentationToOneLookup.FORCEPOPULATECHILDPROPERTIES)) {
                 fieldMetadataOverride.setForcePopulateChildProperties(StringUtils.isEmpty(stringValue)?entry.getValue().booleanOverrideValue():
                                         Boolean.parseBoolean(stringValue));
+            } else if (entry.getKey().equals(PropertyType.AdminPresentationToOneLookup.ENABLETYPEAHEADLOOKUP)) {
+                fieldMetadataOverride.setEnableTypeaheadLookup(StringUtils.isEmpty(stringValue)?entry.getValue().booleanOverrideValue():
+                                        Boolean.parseBoolean(stringValue));
             } else if (entry.getKey().equals(PropertyType.AdminPresentationToOneLookup.USESERVERSIDEINSPECTIONCACHE)) {
                 fieldMetadataOverride.setUseServerSideInspectionCache(StringUtils.isEmpty(stringValue)?
                                         entry.getValue().booleanOverrideValue():Boolean.parseBoolean(stringValue));
@@ -522,6 +529,7 @@ public class BasicFieldMetadataProvider extends FieldMetadataProviderAdapter {
                 override.setFieldType(SupportedFieldType.ADDITIONAL_FOREIGN_KEY);
                 override.setLookupDisplayProperty(toOneLookup.lookupDisplayProperty());
                 override.setForcePopulateChildProperties(toOneLookup.forcePopulateChildProperties());
+                override.setEnableTypeaheadLookup(toOneLookup.enableTypeaheadLookup());
                 override.setCustomCriteria(toOneLookup.customCriteria());
                 override.setUseServerSideInspectionCache(toOneLookup.useServerSideInspectionCache());
                 override.setToOneLookupCreatedViaAnnotation(true);
@@ -679,6 +687,9 @@ public class BasicFieldMetadataProvider extends FieldMetadataProviderAdapter {
         }
         if (basicFieldMetadata.getForcePopulateChildProperties()!=null) {
             metadata.setForcePopulateChildProperties(basicFieldMetadata.getForcePopulateChildProperties());
+        }
+        if (basicFieldMetadata.getEnableTypeaheadLookup()!=null) {
+            metadata.setEnableTypeaheadLookup(basicFieldMetadata.getEnableTypeaheadLookup());
         }
         if (basicFieldMetadata.getCustomCriteria() != null) {
             metadata.setCustomCriteria(basicFieldMetadata.getCustomCriteria());

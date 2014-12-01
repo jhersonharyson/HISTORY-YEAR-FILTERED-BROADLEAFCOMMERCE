@@ -1,19 +1,22 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.dto;
 
 import org.broadleafcommerce.openadmin.dto.visitor.MetadataVisitor;
@@ -32,6 +35,8 @@ public class MapMetadata extends CollectionMetadata {
     private String mapKeyOptionEntityDisplayField;
     private String mapKeyOptionEntityValueField;
     private Boolean forceFreeFormKeys;
+    private String toOneTargetProperty;
+    private String toOneParentProperty;
 
     public String getValueClassName() {
         return valueClassName;
@@ -105,6 +110,22 @@ public class MapMetadata extends CollectionMetadata {
         this.forceFreeFormKeys = forceFreeFormKeys;
     }
 
+    public String getToOneTargetProperty() {
+        return toOneTargetProperty;
+    }
+
+    public void setToOneTargetProperty(String toOneTargetProperty) {
+        this.toOneTargetProperty = toOneTargetProperty;
+    }
+
+    public String getToOneParentProperty() {
+        return toOneParentProperty;
+    }
+
+    public void setToOneParentProperty(String toOneParentProperty) {
+        this.toOneParentProperty = toOneParentProperty;
+    }
+
     @Override
     public void accept(MetadataVisitor visitor) {
         visitor.visit(this);
@@ -121,6 +142,8 @@ public class MapMetadata extends CollectionMetadata {
         ((MapMetadata) metadata).mapKeyOptionEntityDisplayField = mapKeyOptionEntityDisplayField;
         ((MapMetadata) metadata).mapKeyOptionEntityValueField = mapKeyOptionEntityValueField;
         ((MapMetadata) metadata).forceFreeFormKeys = forceFreeFormKeys;
+        ((MapMetadata) metadata).toOneTargetProperty = toOneTargetProperty;
+        ((MapMetadata) metadata).toOneParentProperty = toOneParentProperty;
 
         return super.populate(metadata);
     }
@@ -134,7 +157,8 @@ public class MapMetadata extends CollectionMetadata {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof MapMetadata)) return false;
+        if (o == null) return false;
+        if (!getClass().isAssignableFrom(o.getClass())) return false;
         if (!super.equals(o)) return false;
 
         MapMetadata metadata = (MapMetadata) o;

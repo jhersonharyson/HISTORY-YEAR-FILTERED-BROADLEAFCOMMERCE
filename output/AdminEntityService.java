@@ -1,31 +1,39 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.service;
 
+import org.broadleafcommerce.common.admin.domain.AdminMainEntity;
 import org.broadleafcommerce.common.exception.ServiceException;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.openadmin.dto.ClassMetadata;
+import org.broadleafcommerce.openadmin.dto.CriteriaTransferObject;
 import org.broadleafcommerce.openadmin.dto.DynamicResultSet;
 import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.FilterAndSortCriteria;
 import org.broadleafcommerce.openadmin.dto.Property;
+import org.broadleafcommerce.openadmin.dto.SectionCrumb;
 import org.broadleafcommerce.openadmin.server.domain.PersistencePackageRequest;
+import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceResponse;
 import org.broadleafcommerce.openadmin.web.form.entity.EntityForm;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,7 +48,7 @@ public interface AdminEntityService {
      * @return ClassMetadata for the given request
      * @throws ServiceException
      */
-    public ClassMetadata getClassMetadata(PersistencePackageRequest request)
+    public PersistenceResponse getClassMetadata(PersistencePackageRequest request)
             throws ServiceException;
 
     /**
@@ -50,7 +58,7 @@ public interface AdminEntityService {
      * @return DynamicResultSet 
      * @throws ServiceException
      */
-    public DynamicResultSet getRecords(PersistencePackageRequest request)
+    public PersistenceResponse getRecords(PersistencePackageRequest request)
             throws ServiceException;
 
     /**
@@ -63,7 +71,7 @@ public interface AdminEntityService {
      * @return the Entity
      * @throws ServiceException
      */
-    public Entity getRecord(PersistencePackageRequest request, String id, ClassMetadata cmd, boolean isCollectionRequest)
+    public PersistenceResponse getRecord(PersistencePackageRequest request, String id, ClassMetadata cmd, boolean isCollectionRequest)
             throws ServiceException;
 
     /**
@@ -74,7 +82,7 @@ public interface AdminEntityService {
      * @return the persisted Entity
      * @throws ServiceException
      */
-    public Entity addEntity(EntityForm entityForm, String[] customCriteria)
+    public PersistenceResponse addEntity(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumb)
             throws ServiceException;
 
     /**
@@ -85,7 +93,7 @@ public interface AdminEntityService {
      * @return the persisted Entity
      * @throws ServiceException
      */
-    public Entity updateEntity(EntityForm entityForm, String[] customCriteria)
+    public PersistenceResponse updateEntity(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumb)
             throws ServiceException;
 
     /**
@@ -95,8 +103,92 @@ public interface AdminEntityService {
      * @param customCriteria
      * @throws ServiceException
      */
-    public void removeEntity(EntityForm entityForm, String[] customCriteria)
+    public PersistenceResponse removeEntity(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumb)
             throws ServiceException;
+
+    /**
+     * Thin layer on top of {@link DynamicEntityService#add(org.broadleafcommerce.openadmin.dto.PersistencePackage)} that
+     * swallows all {@link ValidationException}s that could be thrown and still just returns a {@link PersistenceResponse}
+     * with the {@link Entity} that failed validation.
+     * 
+     * @param request
+     * @return
+     * @throws ServiceException if there were exceptions other than a {@link ValidationException} that was thrown as a
+     * result of the attempted add
+     */
+    public PersistenceResponse add(PersistencePackageRequest request) throws ServiceException;
+    
+    /**
+     * Works the same as {@link #add(PersistencePackageRequest)} but you can optionally invoke the transactional version
+     * of {@link DynamicEntityRemoteService#add(org.broadleafcommerce.openadmin.dto.PersistencePackage)} in situations
+     * where you want to manage the transactions in a parent component
+     * 
+     * @param request
+     * @param transactional
+     * @return
+     * @throws ServiceException
+     */
+    public PersistenceResponse add(PersistencePackageRequest request, boolean transactional) throws ServiceException;
+    
+    /**
+     * Thin layer on top of {@link DynamicEntityService#update(org.broadleafcommerce.openadmin.dto.PersistencePackage)}
+     * @param request
+     * @return
+     * @throws ServiceException if there were exceptions other than a {@link ValidationException} that was thrown as a
+     * result of the attempted update
+     */
+    public PersistenceResponse update(PersistencePackageRequest request) throws ServiceException;
+    
+    /**
+     * Works the same as {@link #update(PersistencePackageRequest)} but you can optionally invoke the transactional version
+     * of {@link DynamicEntityRemoteService#update(org.broadleafcommerce.openadmin.dto.PersistencePackage)} in situations
+     * where you want to manage the transactions in a parent component
+     * 
+     * @param request
+     * @param transactional
+     * @return
+     * @throws ServiceException
+     */
+    public PersistenceResponse update(PersistencePackageRequest request, boolean transactional) throws ServiceException;
+
+    /**
+     * Thin layer on top of {@link DynamicEntityService#inspect(org.broadleafcommerce.openadmin.dto.PersistencePackage)}
+     * @param request
+     * @return
+     * @throws ServiceException
+     */
+    public PersistenceResponse inspect(PersistencePackageRequest request) throws ServiceException;
+
+    /**
+     * Thin layer on top of {@link DynamicEntityService#remove(org.broadleafcommerce.openadmin.dto.PersistencePackage)}
+     * @param request
+     * @return
+     * @throws ServiceException
+     */
+    public PersistenceResponse remove(PersistencePackageRequest request) throws ServiceException;
+    
+    /**
+     * Works the same as {@link #remove(PersistencePackageRequest)} but you can optionally invoke the transactional version
+     * of {@link DynamicEntityRemoteService#remove(org.broadleafcommerce.openadmin.dto.PersistencePackage)} in situations
+     * where you want to manage the transactions in a parent component
+     * 
+     * @param request
+     * @param transactional
+     * @return
+     * @throws ServiceException
+     */
+    public PersistenceResponse remove(PersistencePackageRequest request, boolean transactional) throws ServiceException;
+
+    /**
+     * Thin layer on top of {@link DynamicEntityService#fetch(org.broadleafcommerce.openadmin.dto.PersistencePackage, org.broadleafcommerce.openadmin.dto.CriteriaTransferObject)}.
+     * This will glean and create a {@link CriteriaTransferObject} from {@link PersistencePackageRequest#getFilterAndSortCriteria()}
+     * to pass to {@link DynamicEntityService}.
+     * 
+     * @param request
+     * @return
+     * @throws ServiceException
+     */
+    public PersistenceResponse fetch(PersistencePackageRequest request) throws ServiceException;
 
     /**
      * Gets an Entity representing a specific collection item
@@ -108,8 +200,8 @@ public interface AdminEntityService {
      * @return the Entity
      * @throws ServiceException
      */
-    public Entity getAdvancedCollectionRecord(ClassMetadata containingClassMetadata, Entity containingEntity,
-            Property collectionProperty, String collectionItemId)
+    public PersistenceResponse getAdvancedCollectionRecord(ClassMetadata containingClassMetadata, Entity containingEntity,
+            Property collectionProperty, String collectionItemId, List<SectionCrumb> sectionCrumb, String alternateId)
             throws ServiceException;
 
     /**
@@ -125,8 +217,8 @@ public interface AdminEntityService {
      * @return the DynamicResultSet
      * @throws ServiceException
      */
-    public DynamicResultSet getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity, 
-            Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex)
+    public PersistenceResponse getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
+            Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex, List<SectionCrumb> sectionCrumb)
             throws ServiceException;
     
     /**
@@ -140,12 +232,12 @@ public interface AdminEntityService {
      * @param startIndex
      * @param maxIndex
      * @param idValueOverride
-     * @return the DynamicResultSet
+     * @return the PersistenceResponse
      * @throws ServiceException
      */
-    public DynamicResultSet getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity, 
+    public PersistenceResponse getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
             Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex, 
-            String idValueOverride) throws ServiceException;
+            String idValueOverride, List<SectionCrumb> sectionCrumb) throws ServiceException;
     /**
      * Returns all records for all subcollections of the specified request and its primary key
      * 
@@ -157,7 +249,7 @@ public interface AdminEntityService {
      * @see #getRecordsForCollection(ClassMetadata, String, Property)
      */
     public Map<String, DynamicResultSet> getRecordsForAllSubCollections(PersistencePackageRequest ppr, 
-            Entity containingEntity)
+            Entity containingEntity, List<SectionCrumb> sectionCrumb)
             throws ServiceException;
 
     /**
@@ -171,8 +263,8 @@ public interface AdminEntityService {
      * @throws ServiceException
      * @throws ClassNotFoundException
      */
-    public Entity addSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field, 
-            Entity parentEntity)
+    public PersistenceResponse addSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field,
+            Entity parentEntity, List<SectionCrumb> sectionCrumb)
             throws ServiceException, ClassNotFoundException;
 
     /**
@@ -187,8 +279,25 @@ public interface AdminEntityService {
      * @throws ServiceException
      * @throws ClassNotFoundException
      */
-    public Entity updateSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field,
-            Entity parentEntity, String collectionItemId)
+    public PersistenceResponse updateSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field,
+            Entity parentEntity, String collectionItemId, List<SectionCrumb> sectionCrumb)
+            throws ServiceException, ClassNotFoundException;
+
+    /**
+     * Updates the specified collection item
+     *
+     * @param entityForm
+     * @param mainMetadata
+     * @param field
+     * @param parentEntity
+     * @param collectionItemId
+     * @param alternateId
+     * @return the persisted Entity
+     * @throws ServiceException
+     * @throws ClassNotFoundException
+     */
+    public PersistenceResponse updateSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field,
+            Entity parentEntity, String collectionItemId, String alternateId, List<SectionCrumb> sectionCrumb)
             throws ServiceException, ClassNotFoundException;
 
     /**
@@ -196,13 +305,28 @@ public interface AdminEntityService {
      * 
      * @param mainMetadata
      * @param field
-     * @param parentId
+     * @param parentEntity
      * @param itemId
      * @param priorKey - only needed for Map type collections
      * @throws ServiceException
      */
-    public void removeSubCollectionEntity(ClassMetadata mainMetadata, Property field, Entity parentEntity, String itemId,
-            String priorKey)
+    public PersistenceResponse removeSubCollectionEntity(ClassMetadata mainMetadata, Property field, Entity parentEntity, String itemId,
+            String priorKey, List<SectionCrumb> sectionCrumb)
+            throws ServiceException;
+
+    /**
+     * Removes the given item from the specified collection.
+     *
+     * @param mainMetadata
+     * @param field
+     * @param parentEntity
+     * @param itemId
+     * @param alternateId
+     * @param priorKey - only needed for Map type collections
+     * @throws ServiceException
+     */
+    public PersistenceResponse removeSubCollectionEntity(ClassMetadata mainMetadata, Property field, Entity parentEntity,
+            String itemId, String alternateId, String priorKey, List<SectionCrumb> sectionCrumb)
             throws ServiceException;
 
     /**
@@ -226,6 +350,16 @@ public interface AdminEntityService {
      * @throws ServiceException
      */
     public String getIdProperty(ClassMetadata cmd) throws ServiceException;
+
+    /**
+     * For the given class (which could be an interface) and id, finds the {@link AdminMainEntity} value for the 
+     * foreign entity
+     * 
+     * @param owningClass
+     * @param id
+     * @return the friendly name for the given foreign entity
+     */
+    public String getForeignEntityName(String owningClass, String id);
 
 
 }

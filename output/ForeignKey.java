@@ -1,24 +1,28 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
 package org.broadleafcommerce.openadmin.dto;
 
-import java.io.Serializable;
-
 import org.broadleafcommerce.common.presentation.client.ForeignKeyRestrictionType;
 import org.broadleafcommerce.openadmin.dto.visitor.PersistencePerspectiveItemVisitor;
+
+import java.io.Serializable;
 
 
 /**
@@ -38,6 +42,8 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
     private ForeignKeyRestrictionType restrictionType = ForeignKeyRestrictionType.ID_EQ;
     private String displayValueProperty = "name";
     private Boolean mutable = true;
+    private String sortField;
+    private Boolean sortAscending;
     
     public ForeignKey() {
         //do nothing
@@ -50,11 +56,11 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
     public ForeignKey(String manyToField, String foreignKeyClass, String dataSourceName) {
         this(manyToField, foreignKeyClass, dataSourceName, ForeignKeyRestrictionType.ID_EQ);
     }
-    
+
     public ForeignKey(String manyToField, String foreignKeyClass, String dataSourceName, ForeignKeyRestrictionType restrictionType) {
         this(manyToField, foreignKeyClass, dataSourceName, restrictionType, "name");
     }
-    
+
     public ForeignKey(String manyToField, String foreignKeyClass, String dataSourceName, ForeignKeyRestrictionType restrictionType, String displayValueProperty) {
         this.manyToField = manyToField;
         this.foreignKeyClass = foreignKeyClass;
@@ -111,6 +117,22 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
         this.displayValueProperty = displayValueProperty;
     }
 
+    public String getSortField() {
+        return sortField;
+    }
+
+    public void setSortField(String sortField) {
+        this.sortField = sortField;
+    }
+
+    public Boolean getSortAscending() {
+        return sortAscending;
+    }
+
+    public void setSortAscending(Boolean sortAscending) {
+        this.sortAscending = sortAscending;
+    }
+
     public Boolean getMutable() {
         return mutable;
     }
@@ -131,16 +153,20 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
         visitor.visit(this);
     }
 
+    @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(manyToField);
-        sb.append(foreignKeyClass);
-        sb.append(currentValue);
-        sb.append(dataSourceName);
-        sb.append(restrictionType);
-        sb.append(displayValueProperty);
-        sb.append(originatingField);
-
+        final StringBuilder sb = new StringBuilder("ForeignKey{");
+        sb.append("manyToField='").append(manyToField).append('\'');
+        sb.append(", originatingField='").append(originatingField).append('\'');
+        sb.append(", foreignKeyClass='").append(foreignKeyClass).append('\'');
+        sb.append(", currentValue='").append(currentValue).append('\'');
+        sb.append(", dataSourceName='").append(dataSourceName).append('\'');
+        sb.append(", restrictionType=").append(restrictionType);
+        sb.append(", displayValueProperty='").append(displayValueProperty).append('\'');
+        sb.append(", sortField='").append(sortField).append('\'');
+        sb.append(", sortAscending=").append(sortAscending).append('\'');
+        sb.append(", mutable=").append(mutable);
+        sb.append('}');
         return sb.toString();
     }
 
@@ -152,6 +178,8 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
         foreignKey.dataSourceName = dataSourceName;
         foreignKey.restrictionType = restrictionType;
         foreignKey.displayValueProperty = displayValueProperty;
+        foreignKey.sortField = sortField;
+        foreignKey.sortAscending = sortAscending;
         foreignKey.mutable = mutable;
         foreignKey.originatingField = originatingField;
 
@@ -166,7 +194,8 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ForeignKey)) return false;
+        if (o == null) return false;
+        if (!getClass().isAssignableFrom(o.getClass())) return false;
 
         ForeignKey that = (ForeignKey) o;
 
@@ -178,6 +207,9 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
             return false;
         if (foreignKeyClass != null ? !foreignKeyClass.equals(that.foreignKeyClass) : that.foreignKeyClass != null)
             return false;
+        if (sortAscending != null ? !sortAscending.equals(that.sortAscending) : that.sortAscending != null)
+            return false;
+        if (sortField != null ? !sortField.equals(that.sortField) : that.sortField != null) return false;
         if (manyToField != null ? !manyToField.equals(that.manyToField) : that.manyToField != null) return false;
         if (mutable != null ? !mutable.equals(that.mutable) : that.mutable != null) return false;
         if (originatingField != null ? !originatingField.equals(that.originatingField) : that.originatingField != null)
@@ -194,6 +226,8 @@ public class ForeignKey implements Serializable, PersistencePerspectiveItem {
         result = 31 * result + (foreignKeyClass != null ? foreignKeyClass.hashCode() : 0);
         result = 31 * result + (currentValue != null ? currentValue.hashCode() : 0);
         result = 31 * result + (dataSourceName != null ? dataSourceName.hashCode() : 0);
+        result = 31 * result + (sortField != null ? sortField.hashCode() : 0);
+        result = 31 * result + (sortAscending != null ? sortAscending.hashCode() : 0);
         result = 31 * result + (restrictionType != null ? restrictionType.hashCode() : 0);
         result = 31 * result + (displayValueProperty != null ? displayValueProperty.hashCode() : 0);
         result = 31 * result + (mutable != null ? mutable.hashCode() : 0);

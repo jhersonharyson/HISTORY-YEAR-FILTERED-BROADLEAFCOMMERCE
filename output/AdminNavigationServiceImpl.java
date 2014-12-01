@@ -1,19 +1,22 @@
 /*
- * Copyright 2008-2009 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *       http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.security.service.navigation;
 
 import org.apache.commons.beanutils.BeanComparator;
@@ -29,13 +32,16 @@ import org.broadleafcommerce.openadmin.server.security.domain.AdminPermission;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminRole;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminSection;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
+import org.broadleafcommerce.openadmin.server.security.service.AdminSecurityService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+
+import javax.annotation.Resource;
 
 /**
  * This service is used to build the left hand navigation for the admin
@@ -52,6 +58,17 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
 
     @Resource(name="blAdditionalSectionAuthorizations")
     protected List<SectionAuthorization> additionalSectionAuthorizations = new ArrayList<SectionAuthorization>();
+
+    @Override
+    @Transactional("blTransactionManager")
+    public AdminSection save(AdminSection adminSection) {
+        return adminNavigationDao.save(adminSection);
+    }
+
+    @Override
+    public void remove(AdminSection adminSection) {
+        adminNavigationDao.remove(adminSection);
+    }
 
     @Override
     public AdminMenu buildMenu(AdminUser adminUser) {
@@ -108,9 +125,9 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
     }
     
     @Override
-    public AdminSection findAdminSectionByClass(String className) {
+    public AdminSection findAdminSectionByClassAndSectionId(String className, String sectionId) {
         try {
-            return findAdminSectionByClass(Class.forName(className));
+            return findAdminSectionByClassAndSectionId(Class.forName(className), sectionId);
         } catch (ClassNotFoundException e) {
             LOG.warn("Invalid classname received. This likely points to a configuration error.");
             return null;
@@ -118,8 +135,8 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
     }
     
     @Override
-    public AdminSection findAdminSectionByClass(Class<?> clazz) {
-        return adminNavigationDao.readAdminSectionByClass(clazz);
+    public AdminSection findAdminSectionByClassAndSectionId(Class<?> clazz, String sectionId) {
+        return adminNavigationDao.readAdminSectionByClassAndSectionId(clazz, sectionId);
     }
 
     @Override
@@ -150,6 +167,14 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
                     }
                 }
             }
+            for (String defaultPermission : AdminSecurityService.DEFAULT_PERMISSIONS) {
+                for (AdminPermission authorizedPermission : authorizedPermissions) {
+                    if (authorizedPermission.getName().equals(defaultPermission)) {
+                        response = true;
+                        break checkAuth;
+                    }
+                }
+            }
         }
 
         if (response) {
@@ -162,6 +187,13 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
         }
 
         return response;
+    }
+    
+    @Override
+    public List<AdminSection> findAllAdminSections() {
+        List<AdminSection> sections = adminNavigationDao.readAllAdminSections();
+        Collections.sort(sections, SECTION_COMPARATOR);
+        return sections;
     }
 
     protected boolean checkPermissions(List<AdminPermission> authorizedPermissions, AdminPermission permission) {

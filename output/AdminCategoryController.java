@@ -1,25 +1,32 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Admin Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.admin.web.controller.entity;
 
+import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
+import org.broadleafcommerce.common.util.BLCSystemProperty;
 import org.broadleafcommerce.core.catalog.domain.Category;
 import org.broadleafcommerce.core.catalog.service.CatalogService;
 import org.broadleafcommerce.openadmin.web.controller.entity.AdminBasicEntityController;
+import org.broadleafcommerce.openadmin.web.form.entity.EntityForm;
 import org.broadleafcommerce.openadmin.web.form.entity.EntityFormAction;
+import org.broadleafcommerce.openadmin.web.form.entity.Field;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
@@ -58,13 +65,43 @@ public class AdminCategoryController extends AdminBasicEntityController {
         return SECTION_KEY;
     }
     
-    @SuppressWarnings("unchecked")
+    protected boolean getTreeViewEnabled() {
+        return BLCSystemProperty.resolveBooleanSystemProperty("admin.category.treeViewEnabled");
+    }
+
+    @Override
+    protected void modifyEntityForm(EntityForm ef, Map<String, String> pathVars) {
+        Field overrideGeneratedUrl = ef.findField("overrideGeneratedUrl");
+        overrideGeneratedUrl.setFieldType(SupportedFieldType.HIDDEN.toString().toLowerCase());
+    }
+
+    @Override
+    protected void modifyAddEntityForm(EntityForm ef, Map<String, String> pathVars) {
+        Field overrideGeneratedUrl = ef.findField("overrideGeneratedUrl");
+        overrideGeneratedUrl.setFieldType(SupportedFieldType.HIDDEN.toString().toLowerCase());
+        boolean overriddenUrl = Boolean.parseBoolean(overrideGeneratedUrl.getValue());
+        Field fullUrl = ef.findField("url");
+        fullUrl.withAttribute("overriddenUrl", overriddenUrl)
+            .withAttribute("sourceField", "name")
+            .withAttribute("toggleField", "overrideGeneratedUrl")
+            .withFieldType(SupportedFieldType.GENERATED_URL.toString().toLowerCase());
+    }
+    
     @RequestMapping(value = "", method = RequestMethod.GET)
     public String viewEntityList(HttpServletRequest request, HttpServletResponse response, Model model,
-            @PathVariable  Map<String, String> pathVars,
-            @RequestParam  MultiValueMap<String, String> requestParams) throws Exception {
-        super.viewEntityList(request, response, model, pathVars, requestParams);
-        
+            @PathVariable Map<String, String> pathVars,
+            @RequestParam MultiValueMap<String, String> requestParams) throws Exception {
+        String returnPath = super.viewEntityList(request, response, model, pathVars, requestParams);
+
+        if (getTreeViewEnabled()) {
+            return entityListWithTreeView(model);
+        } else {
+            return returnPath;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    protected String entityListWithTreeView(Model model) {
         List<Category> parentCategories = catalogService.findAllParentCategories();
         model.addAttribute("parentCategories", parentCategories);
         

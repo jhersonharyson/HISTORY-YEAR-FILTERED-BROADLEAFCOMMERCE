@@ -1,19 +1,22 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Admin Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.admin.server.service.handler;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -22,28 +25,33 @@ import org.broadleafcommerce.openadmin.server.service.persistence.module.criteri
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.FieldPathBuilder;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.Restriction;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.RestrictionFactory;
-import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate .BetweenDatePredicateProvider;
+import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.BetweenDatePredicateProvider;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.BetweenPredicateProvider;
-import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate .CollectionSizeEqualPredicateProvider;
+import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.CollectionSizeEqualPredicateProvider;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.EqPredicateProvider;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.IsNullPredicateProvider;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.LikePredicateProvider;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.PredicateProvider;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 import javax.annotation.Resource;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.From;
 import javax.persistence.criteria.Path;
 import javax.persistence.criteria.Predicate;
-import java.util.List;
 
 /**
  * This class takes into account that filters should be applied on either the root Sku property itself OR the defaultSku
  * for this particular Sku.
  *
  * @author Jeff Fischer
+ * @deprecated this was originally designed to search for Skus by the default Sku property if it was not set on an additional
+ * sku. In practice this led to a lot of performance issues to actually make it work correctly. Rather than filter directly
+ * on Skus then Sku searches/filters should instead go through a Product first
  */
+@Deprecated
 @Component("blSkuRestrictionFactory")
 public class SkuRestrictionFactoryImpl implements RestrictionFactory {
 

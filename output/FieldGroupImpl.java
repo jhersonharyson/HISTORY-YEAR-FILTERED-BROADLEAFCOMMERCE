@@ -1,28 +1,37 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.field.domain;
 
+import org.broadleafcommerce.common.copy.CreateResponse;
+import org.broadleafcommerce.common.copy.MultiTenantCopyContext;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransform;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformMember;
+import org.broadleafcommerce.common.extensibility.jpa.copy.DirectCopyTransformTypes;
+import org.broadleafcommerce.common.extensibility.jpa.copy.ProfileEntity;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
-import org.hibernate.annotations.Cascade;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.Parameter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.persistence.CascadeType;
@@ -43,6 +52,11 @@ import javax.persistence.Table;
 @Inheritance(strategy = InheritanceType.JOINED)
 @Table(name = "BLC_FLD_GROUP")
 @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
+@DirectCopyTransform({
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.SANDBOX, skipOverlaps = true),
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE)
+})
+@ProfileEntity
 public class FieldGroupImpl implements FieldGroup {
 
     private static final long serialVersionUID = 1L;
@@ -66,12 +80,11 @@ public class FieldGroupImpl implements FieldGroup {
     @Column (name = "INIT_COLLAPSED_FLAG")
     protected Boolean initCollapsedFlag = false;
 
-    @OneToMany(mappedBy = "fieldGroup", targetEntity = FieldDefinitionImpl.class, cascade = {CascadeType.ALL})
-    @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
+    @OneToMany(mappedBy = "fieldGroup", targetEntity = FieldDefinitionImpl.class, cascade = { CascadeType.ALL }, orphanRemoval = true)
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE, region="blCMSElements")
     @OrderBy("fieldOrder")
     @BatchSize(size = 20)
-    protected List<FieldDefinition> fieldDefinitions;
+    protected List<FieldDefinition> fieldDefinitions = new ArrayList<FieldDefinition>();
 
     @Override
     public Long getId() {
@@ -113,5 +126,21 @@ public class FieldGroupImpl implements FieldGroup {
         this.fieldDefinitions = fieldDefinitions;
     }
 
+    @Override
+    public <G extends FieldGroup> CreateResponse<G> createOrRetrieveCopyInstance(MultiTenantCopyContext context)
+            throws CloneNotSupportedException {
+        CreateResponse<G> createResponse = context.createOrRetrieveCopyInstance(this);
+        if (createResponse.isAlreadyPopulated()) {
+            return createResponse;
+        }
+        FieldGroup cloned = createResponse.getClone();
+        cloned.setInitCollapsedFlag(initCollapsedFlag);
+        cloned.setName(name);
+        for (FieldDefinition fieldDefinition : fieldDefinitions) {
+            FieldDefinition clonedDef = fieldDefinition.createOrRetrieveCopyInstance(context).getClone();
+            cloned.getFieldDefinitions().add(clonedDef);
+        }
+        return createResponse;
+    }
 }
 

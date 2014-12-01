@@ -1,23 +1,27 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce CMS Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.cms.page.dao;
 
 import org.broadleafcommerce.cms.page.domain.Page;
 import org.broadleafcommerce.cms.page.domain.PageField;
+import org.broadleafcommerce.cms.page.domain.PageFieldImpl;
 import org.broadleafcommerce.cms.page.domain.PageImpl;
 import org.broadleafcommerce.cms.page.domain.PageTemplate;
 import org.broadleafcommerce.cms.page.domain.PageTemplateImpl;
@@ -25,22 +29,25 @@ import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
 import org.broadleafcommerce.common.sandbox.domain.SandBox;
 import org.broadleafcommerce.common.sandbox.domain.SandBoxImpl;
-import org.broadleafcommerce.common.sandbox.domain.SandBoxType;
+import org.broadleafcommerce.common.time.SystemTime;
+import org.broadleafcommerce.common.util.dao.TQRestriction;
+import org.broadleafcommerce.common.util.dao.TQRestriction.Mode;
+import org.broadleafcommerce.common.util.dao.TypedQueryBuilder;
 import org.hibernate.ejb.QueryHints;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import javax.annotation.Resource;
 import javax.persistence.EntityManager;
 import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
+import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Path;
 import javax.persistence.criteria.Root;
 
 /**
@@ -66,6 +73,22 @@ public class PageDaoImpl implements PageDao {
     }
 
     @Override
+    public List<PageField> readPageFieldsByPageId(Long pageId) {
+        CriteriaBuilder builder = em.getCriteriaBuilder();
+
+        CriteriaQuery<PageField> criteria = builder.createQuery(PageField.class);
+        Root<PageFieldImpl> pageField = criteria.from(PageFieldImpl.class);
+        criteria.select(pageField);
+
+        Path<Object> path = pageField.get("page").get("id");
+        criteria.where(builder.equal(pageField.get("page").get("id"), pageId));
+
+        TypedQuery<PageField> query = em.createQuery(criteria);
+        query.setHint(QueryHints.HINT_CACHEABLE, true);
+        return query.getResultList();
+    }
+
+    @Override
     public PageTemplate readPageTemplateById(Long id) {
         return em.find(PageTemplateImpl.class, id);
     }
@@ -74,20 +97,6 @@ public class PageDaoImpl implements PageDao {
     @Override
     public PageTemplate savePageTemplate(PageTemplate template) {
         return em.merge(template);
-    }
-
-    @Override
-    public Map<String, PageField> readPageFieldsByPage(Page page) {
-        Query query = em.createNamedQuery("BC_READ_PAGE_FIELDS_BY_PAGE_ID");
-        query.setParameter("page", page);
-        query.setHint(QueryHints.HINT_CACHEABLE, true);
-
-        List<PageField> pageFields = query.getResultList();
-        Map<String, PageField> pageFieldMap = new HashMap<String, PageField>();
-        for (PageField pageField : pageFields) {
-            pageFieldMap.put(pageField.getFieldKey(), pageField);
-        }
-        return pageFieldMap;
     }
 
     @Override
@@ -109,24 +118,31 @@ public class PageDaoImpl implements PageDao {
     }
 
     @Override
-    public List<Page> findPageByURI(SandBox sandBox, Locale fullLocale, Locale languageOnlyLocale, String uri) {
+    public List<Page> findPageByURI(String uri) {
+        TypedQuery<Page> q = new TypedQueryBuilder<Page>(Page.class, "p")
+            .addRestriction("p.fullUrl", "=", uri)
+            .addRestriction(new TQRestriction(Mode.OR)
+                .addChildRestriction(new TQRestriction("p.activeStartDate", "IS NULL"))
+                .addChildRestriction(new TQRestriction("p.activeStartDate", "<=", SystemTime.asDate())))
+            .addRestriction(new TQRestriction(Mode.OR)
+                .addChildRestriction(new TQRestriction("p.activeEndDate", "IS NULL"))
+                .addChildRestriction(new TQRestriction("p.activeEndDate", ">=", SystemTime.asDate())))
+            .addRestriction(new TQRestriction(Mode.OR)
+                .addChildRestriction(new TQRestriction("p.offlineFlag", "IS NULL"))
+                .addChildRestriction(new TQRestriction("p.offlineFlag", "=", false)))
+            .toQuery(em);
+        List<Page> pages = q.getResultList();
+        return pages;
+    }
+
+    @Override
+    public List<Page> findPageByURI(Locale fullLocale, Locale languageOnlyLocale, String uri) {
         Query query;
 
         if (languageOnlyLocale == null)  {
             languageOnlyLocale = fullLocale;
         }
-
-        // locale
-        if (sandBox == null) {
-            query = em.createNamedQuery("BC_READ_PAGE_BY_URI");
-        } else if (SandBoxType.PRODUCTION.equals(sandBox.getSandBoxType())) {
-            query = em.createNamedQuery("BC_READ_PAGE_BY_URI_AND_PRODUCTION_SANDBOX");
-            query.setParameter("sandbox", sandBox);
-        } else {
-            query = em.createNamedQuery("BC_READ_PAGE_BY_URI_AND_USER_SANDBOX");
-            query.setParameter("sandboxId", sandBox.getId());
-        }
-
+        query = em.createNamedQuery("BC_READ_PAGE_BY_URI");
         query.setParameter("fullLocale", fullLocale);
         query.setParameter("languageOnlyLocale", languageOnlyLocale);
         query.setParameter("uri", uri);
@@ -150,6 +166,23 @@ public class PageDaoImpl implements PageDao {
     }
     
     @Override
+    public List<Page> readOnlineAndIncludedPages(int limit, int offset, String sortBy) {
+        CriteriaBuilder builder = em.getCriteriaBuilder();
+        CriteriaQuery<Page> criteria = builder.createQuery(Page.class);
+        Root<PageImpl> page = criteria.from(PageImpl.class);
+        criteria.select(page);
+        criteria.where(builder.and(
+                builder.or(builder.isFalse(page.get("offlineFlag").as(Boolean.class)), builder.isNull(page.get("offlineFlag").as(Boolean.class))),
+                builder.or(builder.isFalse(page.get("excludeFromSiteMap").as(Boolean.class)), builder.isNull(page.get("excludeFromSiteMap").as(Boolean.class)))));
+        criteria.orderBy(builder.asc(page.get(sortBy)));
+        TypedQuery<Page> query = em.createQuery(criteria);
+        query.setFirstResult(offset);
+        query.setMaxResults(limit);
+
+        return query.getResultList();
+    }
+
+    @Override
     public List<PageTemplate> readAllPageTemplates() {
         CriteriaBuilder builder = em.getCriteriaBuilder();
         CriteriaQuery<PageTemplate> criteria = builder.createQuery(PageTemplate.class);
@@ -165,8 +198,8 @@ public class PageDaoImpl implements PageDao {
     }
 
     @Override
-    public List<Page> findPageByURI(SandBox sandBox, Locale locale, String uri) {
-        return findPageByURI(sandBox, locale, null, uri);
+    public List<Page> findPageByURI(Locale locale, String uri) {
+        return findPageByURI(locale, null, uri);
     }
 
     @Override

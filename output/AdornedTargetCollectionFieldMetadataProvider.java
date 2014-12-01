@@ -1,27 +1,23 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.dao.provider.metadata;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.persistence.ManyToOne;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -53,6 +49,13 @@ import org.broadleafcommerce.openadmin.server.service.type.FieldProviderResponse
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.persistence.ManyToOne;
 
 /**
  * @author Jeff Fischer
@@ -164,7 +167,7 @@ public class AdornedTargetCollectionFieldMetadataProvider extends AdvancedCollec
 
     @Override
     public FieldProviderResponse overrideViaXml(OverrideViaXmlRequest overrideViaXmlRequest, Map<String, FieldMetadata> metadata) {
-        Map<String, FieldMetadataOverride> overrides = getTargetedOverride(overrideViaXmlRequest.getRequestedConfigKey(), overrideViaXmlRequest.getRequestedCeilingEntity());
+        Map<String, FieldMetadataOverride> overrides = getTargetedOverride(overrideViaXmlRequest.getDynamicEntityDao(), overrideViaXmlRequest.getRequestedConfigKey(), overrideViaXmlRequest.getRequestedCeilingEntity());
         if (overrides != null) {
             for (String propertyName : overrides.keySet()) {
                 final FieldMetadataOverride localMetadata = overrides.get(propertyName);
@@ -483,6 +486,9 @@ public class AdornedTargetCollectionFieldMetadataProvider extends AdvancedCollec
         if (adornedTargetCollectionMetadata.getTargetObjectProperty()!=null) {
             targetObjectProperty = adornedTargetCollectionMetadata.getTargetObjectProperty();
         }
+        if (StringUtils.isEmpty(parentObjectIdProperty)) {
+            throw new IllegalArgumentException("targetObjectProperty not defined");
+        }
 
         String joinEntityClass = null;
         if (serverMetadata != null) {
@@ -560,6 +566,7 @@ public class AdornedTargetCollectionFieldMetadataProvider extends AdvancedCollec
             adornedTargetList.setTargetObjectPath(targetObjectProperty);
             adornedTargetList.setTargetIdProperty(targetObjectIdProperty);
             adornedTargetList.setJoinEntityClass(joinEntityClass);
+            adornedTargetList.setIdProperty((String) dynamicEntityDao.getIdMetadata(collectionTarget).get("name"));
             adornedTargetList.setAdornedTargetEntityClassname(collectionTarget.getName());
             adornedTargetList.setSortField(sortProperty);
             adornedTargetList.setSortAscending(isAscending);
@@ -567,6 +574,7 @@ public class AdornedTargetCollectionFieldMetadataProvider extends AdvancedCollec
         } else {
             AdornedTargetList adornedTargetList = new AdornedTargetList(field.getName(), parentObjectProperty, parentObjectIdProperty, targetObjectProperty, targetObjectIdProperty, collectionTarget.getName(), sortProperty, isAscending);
             adornedTargetList.setJoinEntityClass(joinEntityClass);
+            adornedTargetList.setIdProperty((String) dynamicEntityDao.getIdMetadata(collectionTarget).get("name"));
             adornedTargetList.setMutable(metadata.isMutable());
             persistencePerspective.addPersistencePerspectiveItem(PersistencePerspectiveItemType.ADORNEDTARGETLIST, adornedTargetList);
         }

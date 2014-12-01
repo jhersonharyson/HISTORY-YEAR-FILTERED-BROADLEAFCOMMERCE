@@ -1,30 +1,32 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Admin Module
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.admin.server.service.handler;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.exception.ServiceException;
-import org.broadleafcommerce.core.catalog.domain.CategoryProductXref;
-import org.broadleafcommerce.core.catalog.domain.CategoryProductXrefImpl;
-import org.broadleafcommerce.core.catalog.domain.Product;
-import org.broadleafcommerce.core.catalog.domain.ProductBundle;
-import org.broadleafcommerce.core.catalog.domain.Sku;
+import org.broadleafcommerce.common.presentation.client.OperationType;
+import org.broadleafcommerce.core.catalog.dao.ProductDao;
+import org.broadleafcommerce.core.catalog.dao.SkuDao;
+import org.broadleafcommerce.core.catalog.domain.*;
 import org.broadleafcommerce.core.catalog.service.CatalogService;
 import org.broadleafcommerce.core.catalog.service.type.ProductBundlePricingModelType;
 import org.broadleafcommerce.openadmin.dto.BasicFieldMetadata;
@@ -50,6 +52,9 @@ public class ProductCustomPersistenceHandler extends CustomPersistenceHandlerAda
     @Resource(name = "blCatalogService")
     protected CatalogService catalogService;
 
+    @Resource(name = "blProductDao")
+    protected ProductDao productDao;
+
     private static final Log LOG = LogFactory.getLog(ProductCustomPersistenceHandler.class);
 
     @Override
@@ -61,6 +66,11 @@ public class ProductCustomPersistenceHandler extends CustomPersistenceHandlerAda
 
     @Override
     public Boolean canHandleUpdate(PersistencePackage persistencePackage) {
+        return canHandleAdd(persistencePackage);
+    }
+
+    @Override
+    public Boolean canHandleRemove(PersistencePackage persistencePackage) {
         return canHandleAdd(persistencePackage);
     }
 
@@ -114,7 +124,7 @@ public class ProductCustomPersistenceHandler extends CustomPersistenceHandlerAda
             Map<String, FieldMetadata> adminProperties = helper.getSimpleMergedProperties(Product.class.getName(), persistencePerspective);
             Object primaryKey = helper.getPrimaryKey(entity, adminProperties);
             Product adminInstance = (Product) dynamicEntityDao.retrieve(Class.forName(entity.getType()[0]), primaryKey);
-            
+
             if (adminInstance instanceof ProductBundle) {
                 removeBundleFieldRestrictions((ProductBundle)adminInstance, adminProperties, entity);
             }
@@ -135,7 +145,22 @@ public class ProductCustomPersistenceHandler extends CustomPersistenceHandlerAda
             throw new ServiceException("Unable to update entity for " + entity.getType()[0], e);
         }
     }
-    
+
+    @Override
+    public void remove(PersistencePackage persistencePackage, DynamicEntityDao dynamicEntityDao, RecordHelper helper) throws ServiceException {
+        Entity entity = persistencePackage.getEntity();
+        try {
+            PersistencePerspective persistencePerspective = persistencePackage.getPersistencePerspective();
+            Map<String, FieldMetadata> adminProperties = helper.getSimpleMergedProperties(Product.class.getName(), persistencePerspective);
+            Object primaryKey = helper.getPrimaryKey(entity, adminProperties);
+            Product adminInstance = (Product) dynamicEntityDao.retrieve(Class.forName(entity.getType()[0]), primaryKey);
+            // delete product ( set product status to archive)
+            productDao.delete(adminInstance);
+        } catch (Exception e) {
+            throw new ServiceException("Unable to delete  entity for " + entity.getType()[0], e);
+        }
+    }
+
     /**
      * If the pricing model is of type item_sum, that property should not be required
      * @param adminInstance
@@ -150,4 +175,5 @@ public class ProductCustomPersistenceHandler extends CustomPersistenceHandlerAda
             }
         }
     }
+
 }

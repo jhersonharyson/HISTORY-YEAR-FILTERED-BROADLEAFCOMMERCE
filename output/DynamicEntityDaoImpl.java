@@ -1,29 +1,32 @@
 /*
- * Copyright 2008-2013 the original author or authors.
- *
+ * #%L
+ * BroadleafCommerce Open Admin Platform
+ * %%
+ * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * %%
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *        http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * #L%
  */
-
 package org.broadleafcommerce.openadmin.server.dao;
 
 
+import org.apache.commons.collections4.map.LRUMap;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.money.Money;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
-import org.broadleafcommerce.common.persistence.Status;
 import org.broadleafcommerce.common.presentation.AdminPresentationClass;
 import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
@@ -41,8 +44,8 @@ import org.broadleafcommerce.openadmin.server.dao.provider.metadata.request.AddM
 import org.broadleafcommerce.openadmin.server.dao.provider.metadata.request.LateStageAddMetadataRequest;
 import org.broadleafcommerce.openadmin.server.service.AppConfigurationService;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.FieldManager;
+import org.broadleafcommerce.openadmin.server.service.persistence.validation.FieldNamePropertyValidator;
 import org.broadleafcommerce.openadmin.server.service.type.FieldProviderResponse;
-import org.codehaus.jackson.map.util.LRUMap;
 import org.hibernate.Criteria;
 import org.hibernate.MappingException;
 import org.hibernate.SessionFactory;
@@ -51,7 +54,10 @@ import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 import org.hibernate.type.ComponentType;
 import org.hibernate.type.Type;
+import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
@@ -75,6 +81,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Resource;
 import javax.persistence.EntityManager;
 
@@ -85,7 +92,7 @@ import javax.persistence.EntityManager;
  */
 @Component("blDynamicEntityDao")
 @Scope("prototype")
-public class DynamicEntityDaoImpl implements DynamicEntityDao {
+public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContextAware {
     
     private static final Log LOG = LogFactory.getLog(DynamicEntityDaoImpl.class);
     
@@ -122,21 +129,33 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
 
     protected long lastCacheFlushTime = System.currentTimeMillis();
 
+    protected ApplicationContext applicationContext;
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+    }
+
     @Override
     public Criteria createCriteria(Class<?> entityClass) {
         return ((HibernateEntityManager) getStandardEntityManager()).getSession().createCriteria(entityClass);
     }
     
     @Override
-    public Serializable persist(Serializable entity) {
+    public <T> T persist(T entity) {
         standardEntityManager.persist(entity);
         standardEntityManager.flush();
         return entity;
     }
-    
+
     @Override
-    public Serializable merge(Serializable entity) {
-        Serializable response = standardEntityManager.merge(entity);
+    public Object find(Class<?> entityClass, Object key) {
+        return standardEntityManager.find(entityClass, key);
+    }
+
+    @Override
+    public <T> T merge(T entity) {
+        T response = standardEntityManager.merge(entity);
         standardEntityManager.flush();
         return response;
     }
@@ -163,16 +182,10 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
     
     @Override
     public void remove(Serializable entity) {
-        boolean isArchivable = Status.class.isAssignableFrom(entity.getClass());
-        if (isArchivable) {
-            ((Status) entity).setArchived('Y');
-            merge(entity);
-        } else {
-            standardEntityManager.remove(entity);
-            standardEntityManager.flush();
-        }
+        standardEntityManager.remove(entity);
+        standardEntityManager.flush();
     }
-    
+
     @Override
     public void clear() {
         standardEntityManager.clear();
@@ -366,6 +379,24 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
 
             return mergedProperties;
         }
+    }
+    
+    @Override
+    public Map<String, FieldMetadata> getMergedProperties(@Nonnull Class<?> cls) {
+        Class<?>[] polymorphicTypes = getAllPolymorphicEntitiesFromCeiling(cls);
+        return getMergedProperties(
+                cls.getName(),
+                polymorphicTypes,
+                null,
+                new String[] {},
+                new ForeignKey[] {},
+                MergedPropertyType.PRIMARY,
+                true,
+                new String[] {},
+                new String[] {},
+                null,
+                ""
+                );
     }
 
     @Override
@@ -818,7 +849,8 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
             ceilingEntityFullyQualifiedClassname,
             parentClasses,
             prefix,
-            isParentExcluded
+            isParentExcluded,
+            false
         );
         BasicFieldMetadata presentationAttribute = new BasicFieldMetadata();
         presentationAttribute.setExplicitFieldType(SupportedFieldType.STRING);
@@ -880,7 +912,8 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
         String ceilingEntityFullyQualifiedClassname,
         List<Class<?>> parentClasses,
         String prefix,
-        Boolean isParentExcluded
+        Boolean isParentExcluded,
+        Boolean isComponentPrefix
     ) {
         int j = 0;
         Comparator<String> propertyComparator = new Comparator<String>() {
@@ -936,7 +969,7 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
                             additionalNonPersistentProperties, mergedPropertyType, presentationAttributes,
                             componentProperties, fields, idProperty, populateManyToOneFields, includeFields,
                             excludeFields, configurationKey, ceilingEntityFullyQualifiedClassname, parentClasses,
-                            prefix, isParentExcluded, propertyName, type, isPropertyForeignKey, additionalForeignKeyIndexPosition);
+                            prefix, isParentExcluded, propertyName, type, isPropertyForeignKey, additionalForeignKeyIndexPosition, isComponentPrefix);
                     }
                 }
             }
@@ -963,9 +996,11 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
     }
 
     protected Boolean testPropertyRecursion(String prefix, List<Class<?>> parentClasses, String propertyName, Class<?> targetClass,
-                                                String ceilingEntityFullyQualifiedClassname) {
+                                                String ceilingEntityFullyQualifiedClassname, Boolean isComponentPrefix) {
         Boolean includeField = true;
-        if (!StringUtils.isEmpty(prefix)) {
+        //don't want to shun a self-referencing property in an @Embeddable
+        boolean shouldTest = !StringUtils.isEmpty(prefix) && (!isComponentPrefix || prefix.split("\\.").length > 1);
+        if (shouldTest) {
             Field testField = getFieldManager().getField(targetClass, propertyName);
             if (testField == null) {
                 Class<?>[] entities;
@@ -1031,11 +1066,12 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
             String propertyName,
             Type type,
             boolean propertyForeignKey,
-            int additionalForeignKeyIndexPosition) {
+            int additionalForeignKeyIndexPosition,
+            Boolean isComponentPrefix) {
         FieldMetadata presentationAttribute = presentationAttributes.get(propertyName);
         Boolean amIExcluded = isParentExcluded || !testPropertyInclusion(presentationAttribute);
         Boolean includeField = testPropertyRecursion(prefix, parentClasses, propertyName, targetClass,
-            ceilingEntityFullyQualifiedClassname);
+            ceilingEntityFullyQualifiedClassname, isComponentPrefix);
 
         SupportedFieldType explicitType = null;
         if (presentationAttribute != null && presentationAttribute instanceof BasicFieldMetadata) {
@@ -1172,6 +1208,27 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
         Map<String, FieldMetadata> convertedFields = new HashMap<String, FieldMetadata>(newFields.size());
         for (Map.Entry<String, FieldMetadata> key : newFields.entrySet()) {
             convertedFields.put(propertyName + '.' + key.getKey(), key.getValue());
+            if (key.getValue() instanceof BasicFieldMetadata) {
+                for (Map.Entry<String, Map<String, String>> entry : ((BasicFieldMetadata) key.getValue()).getValidationConfigurations().entrySet()) {
+                    Class<?> validatorImpl = null;
+                    try {
+                        validatorImpl = Class.forName(entry.getKey());
+                    } catch (ClassNotFoundException e) {
+                        Object bean = applicationContext.getBean(entry.getKey());
+                        if (bean != null) {
+                            validatorImpl = bean.getClass();
+                        }
+                    }
+                    if (validatorImpl != null && FieldNamePropertyValidator.class.isAssignableFrom(validatorImpl)) {
+                        for (Map.Entry<String, String> configs : entry.getValue().entrySet()) {
+                            if (newFields.containsKey(configs.getValue())) {
+                                configs.setValue(propertyName + "." + configs.getValue());
+                            }
+                        }
+                    }
+                }
+
+            }
         }
         fields.putAll(convertedFields);
     }
@@ -1245,7 +1302,8 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
             ceilingEntityFullyQualifiedClassname,
             parentClasses,
             propertyName + ".",
-            isParentExcluded
+            isParentExcluded,
+            true
         );
         Map<String, FieldMetadata> convertedFields = new HashMap<String, FieldMetadata>();
         for (String key : newFields.keySet()) {
@@ -1274,7 +1332,7 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao {
 
     @Override
     public FieldManager getFieldManager() {
-        return new FieldManager(entityConfiguration, this);
+        return new FieldManager(entityConfiguration, getStandardEntityManager());
     }
 
     @Override
