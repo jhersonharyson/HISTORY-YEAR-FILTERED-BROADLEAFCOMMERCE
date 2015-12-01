@@ -58,9 +58,8 @@ import javax.persistence.Table;
         @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.SANDBOX, skipOverlaps=true),
         @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE)
 })
-@ProfileEntity
 @AdminPresentationClass(populateToOneFields = PopulateToOneFieldsEnum.FALSE)
-public class FieldDefinitionImpl implements FieldDefinition {
+public class FieldDefinitionImpl implements FieldDefinition, ProfileEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -115,6 +114,7 @@ public class FieldDefinitionImpl implements FieldDefinition {
     protected Boolean textAreaFlag = false;
     
     @Column(name = "REQUIRED_FLAG")
+    @AdminPresentation(friendlyName = "FieldDefinitionImpl_requiredFlag", order = 4000,gridOrder = 4000, defaultValue = "false")
     protected Boolean requiredFlag = false;
 
     @ManyToOne(targetEntity = DataDrivenEnumerationImpl.class)

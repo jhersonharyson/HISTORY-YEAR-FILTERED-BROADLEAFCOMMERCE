@@ -20,8 +20,12 @@
 package org.broadleafcommerce.cms.admin.web.controller;
 
 import org.broadleafcommerce.cms.admin.web.service.AssetFormBuilderService;
+import org.broadleafcommerce.cms.file.StaticAssetMultiTenantExtensionManager;
 import org.broadleafcommerce.cms.file.domain.StaticAssetImpl;
 import org.broadleafcommerce.cms.file.service.StaticAssetService;
+import org.broadleafcommerce.cms.file.service.StaticAssetStorageService;
+import org.broadleafcommerce.common.site.domain.Site;
+import org.broadleafcommerce.common.web.BroadleafRequestContext;
 import org.broadleafcommerce.openadmin.web.controller.entity.AdminBasicEntityController;
 import org.broadleafcommerce.openadmin.web.form.component.ListGrid;
 import org.broadleafcommerce.openadmin.web.form.entity.EntityForm;
@@ -30,20 +34,15 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Handles admin operations for the {@link Asset} entity. This is mostly to support displaying image assets inline 
@@ -55,13 +54,19 @@ import javax.servlet.http.HttpServletResponse;
 @RequestMapping("/" + AdminAssetController.SECTION_KEY)
 public class AdminAssetController extends AdminBasicEntityController {
     
-    protected static final String SECTION_KEY = "assets";
+    public static final String SECTION_KEY = "assets";
     
     @Resource(name = "blAssetFormBuilderService")
     protected AssetFormBuilderService formService;
     
     @Resource(name = "blStaticAssetService")
     protected StaticAssetService staticAssetService;
+
+    @Resource(name = "blStaticAssetStorageService")
+    protected StaticAssetStorageService staticAssetStorageService;
+
+    @Resource(name = "blStaticAssetMultiTenantExtensionManager")
+    protected StaticAssetMultiTenantExtensionManager staticAssetExtensionManager;
     
     @Override
     protected String getSectionKey(Map<String, String> pathVars) {
@@ -109,8 +114,14 @@ public class AdminAssetController extends AdminBasicEntityController {
     public String viewEntityForm(HttpServletRequest request, HttpServletResponse response, Model model,
             @PathVariable  Map<String, String> pathVars,
             @PathVariable(value="id") String id) throws Exception {
+        Site currentSite = BroadleafRequestContext.getBroadleafRequestContext().getNonPersistentSite();
+
         model.addAttribute("cmsUrlPrefix", staticAssetService.getStaticAssetUrlPrefix());
-        return super.viewEntityForm(request, response, model, pathVars, id);
+        String returnPath = super.viewEntityForm(request, response, model, pathVars, id);
+
+        staticAssetExtensionManager.getProxy().removeShareOptionsForMTStandardSite(model, currentSite);
+
+        return returnPath;
     }
     
     @Override

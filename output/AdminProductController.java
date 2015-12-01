@@ -44,6 +44,7 @@ import org.broadleafcommerce.openadmin.web.form.component.ListGridAction;
 import org.broadleafcommerce.openadmin.web.form.entity.DefaultEntityFormActions;
 import org.broadleafcommerce.openadmin.web.form.entity.EntityForm;
 import org.broadleafcommerce.openadmin.web.form.entity.Field;
+import org.broadleafcommerce.openadmin.web.controller.modal.ModalHeaderType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
@@ -71,7 +72,7 @@ import javax.servlet.http.HttpServletResponse;
 @RequestMapping("/" + AdminProductController.SECTION_KEY)
 public class AdminProductController extends AdminBasicEntityController {
     
-    protected static final String SECTION_KEY = "product";
+    public static final String SECTION_KEY = "product";
     
     @Resource(name = "blCatalogService")
     protected CatalogService catalogService;
@@ -92,15 +93,32 @@ public class AdminProductController extends AdminBasicEntityController {
 
     @Override
     protected void modifyEntityForm(EntityForm ef, Map<String, String> pathVars) {
+        String defaultCategoryUrlPrefix = null;
+        Field defaultCategory = ef.findField("defaultCategory");
+        if (defaultCategory != null && StringUtils.isNotBlank(defaultCategory.getValue())) {
+            Category cat = catalogService.findCategoryById(Long.parseLong(defaultCategory.getValue()));
+            defaultCategoryUrlPrefix = cat.getUrl();
+        }
+
         Field overrideGeneratedUrl = ef.findField("overrideGeneratedUrl");
         overrideGeneratedUrl.setFieldType(SupportedFieldType.HIDDEN.toString().toLowerCase());
+        boolean overriddenUrl = Boolean.parseBoolean(overrideGeneratedUrl.getValue());
+        Field fullUrl = ef.findField("url");
+        if (fullUrl != null) {
+            fullUrl.withAttribute("overriddenUrl", overriddenUrl)
+                    .withAttribute("sourceField", "defaultSku--name")
+                    .withAttribute("toggleField", "overrideGeneratedUrl")
+                    .withAttribute("prefix-selector", "#field-defaultCategory")
+                    .withAttribute("prefix", defaultCategoryUrlPrefix)
+                    .withFieldType(SupportedFieldType.GENERATED_URL.toString().toLowerCase());
+        }
     }
 
     @Override
     protected void modifyAddEntityForm(EntityForm ef, Map<String, String> pathVars) {
         String defaultCategoryUrlPrefix = null;
         Field defaultCategory = ef.findField("defaultCategory");
-        if (StringUtils.isNotBlank(defaultCategory.getValue())) {
+        if (defaultCategory != null && StringUtils.isNotBlank(defaultCategory.getValue())) {
             Category cat = catalogService.findCategoryById(Long.parseLong(defaultCategory.getValue()));
             defaultCategoryUrlPrefix = cat.getUrl();
         }
@@ -158,7 +176,7 @@ public class AdminProductController extends AdminBasicEntityController {
                 requestUri = requestUri.substring(request.getContextPath().length() + 1, requestUri.length());
             }
             model.addAttribute("currentUri", requestUri);
-            model.addAttribute("modalHeaderType", "addEntity");
+            model.addAttribute("modalHeaderType", ModalHeaderType.ADD_ENTITY.getType());
             setModelAttributes(model, SECTION_KEY);
             return "modules/modalContainer";
         } else {
@@ -172,14 +190,12 @@ public class AdminProductController extends AdminBasicEntityController {
         formService.removeNonApplicableFields(collectionMetadata, entityForm, ppr.getCeilingEntityClassname());
 
         entityForm.removeAction(DefaultEntityFormActions.DELETE);
-
-        removeRequiredValidation(entityForm);
         
         model.addAttribute("entityForm", entityForm);
         model.addAttribute("viewType", "modal/simpleAddEntity");
                 
         model.addAttribute("currentUrl", request.getRequestURL().toString());
-        model.addAttribute("modalHeaderType", "addCollectionItem");
+        model.addAttribute("modalHeaderType", ModalHeaderType.ADD_COLLECTION_ITEM.getType());
         model.addAttribute("collectionProperty", collectionProperty);
         setModelAttributes(model, SECTION_KEY);
         return "modules/modalContainer";
@@ -199,8 +215,8 @@ public class AdminProductController extends AdminBasicEntityController {
         return super.buildAddCollectionItemModel(request, response, model, id, collectionField, sectionKey, collectionProperty, md, ppr, entityForm, entity);
     }
     
-    protected String showUpdateAdditionalSku(HttpServletRequest request, HttpServletResponse response, Model model,
-            String id, String collectionItemId, Map<String, String> pathVars) throws Exception {
+    protected String showUpdateAdditionalSku(HttpServletRequest request, Model model,
+                                             String id, String collectionItemId, Map<String, String> pathVars, EntityForm entityForm) throws Exception {
         String collectionField = "additionalSkus";
         
         // Find out metadata for the additionalSkus property
@@ -217,14 +233,18 @@ public class AdminProductController extends AdminBasicEntityController {
         if (collectionMetadata.getCeilingType().equals(SkuImpl.class.getName())) {
             collectionMetadata.setCeilingType(Sku.class.getName());
         }
-        
+
         Entity entity = service.getRecord(ppr, collectionItemId, collectionMetadata, true).getDynamicResultSet().getRecords()[0];
-        
-        // Find the records for all subcollections of Sku
+
         Map<String, DynamicResultSet> subRecordsMap = service.getRecordsForAllSubCollections(ppr, entity, sectionCrumbs);
-        
-        // Build the entity form for the modal that includes the subcollections
-        EntityForm entityForm = formService.createEntityForm(collectionMetadata, entity, subRecordsMap, sectionCrumbs);
+        if (entityForm == null) {
+            entityForm = formService.createEntityForm(collectionMetadata, entity, subRecordsMap, sectionCrumbs);
+        } else {
+            entityForm.clearFieldsMap();
+            formService.populateEntityForm(collectionMetadata, entity, subRecordsMap, entityForm, sectionCrumbs);
+            //remove all the actions since we're not trying to redisplay them on the form
+            entityForm.removeAllActions();
+        }
         
         entityForm.removeAction(DefaultEntityFormActions.DELETE);
         
@@ -233,14 +253,12 @@ public class AdminProductController extends AdminBasicEntityController {
             lg.setSectionKey("org.broadleafcommerce.core.catalog.domain.Sku");
             lg.setSectionCrumbs(sectionCrumbs);
         }
-
-        removeRequiredValidation(entityForm);
         
         model.addAttribute("entityForm", entityForm);
         model.addAttribute("viewType", "modal/simpleEditEntity");
 
         model.addAttribute("currentUrl", request.getRequestURL().toString());
-        model.addAttribute("modalHeaderType", "updateCollectionItem");
+        model.addAttribute("modalHeaderType", ModalHeaderType.UPDATE_COLLECTION_ITEM.getType());
         model.addAttribute("collectionProperty", collectionProperty);
         setModelAttributes(model, SECTION_KEY);
         return "modules/modalContainer";
@@ -254,9 +272,24 @@ public class AdminProductController extends AdminBasicEntityController {
             @PathVariable(value="collectionField") String collectionField,
             @PathVariable(value="collectionItemId") String collectionItemId) throws Exception {
         if ("additionalSkus".equals(collectionField)) {
-            return showUpdateAdditionalSku(request, response, model, id, collectionItemId, pathVars);
+            return showUpdateAdditionalSku(request, model, id, collectionItemId, pathVars, null);
         }
         return super.showUpdateCollectionItem(request, response, model, pathVars, id, collectionField, collectionItemId);
+    }
+
+    @Override
+    protected String showViewUpdateCollection(HttpServletRequest request, Model model, Map<String, String> pathVars,
+                                              String id, String collectionField, String collectionItemId, String alternateId, String modalHeaderType, EntityForm entityForm, Entity entity) throws ServiceException {
+        try {
+            if ("additionalSkus".equals(collectionField)) {
+                return showUpdateAdditionalSku(request, model, id, collectionItemId, pathVars, entityForm);
+            } else {
+                return super.showViewUpdateCollection(request, model, pathVars, id, collectionField, collectionItemId, alternateId,
+                        modalHeaderType, entityForm, entity);
+            }
+        } catch (Exception e) {
+            throw new ServiceException(e);
+        }
     }
     
     @Override
@@ -302,18 +335,6 @@ public class AdminProductController extends AdminBasicEntityController {
         form.removeListGrid("defaultSku.skuAttributes");
         
         return view;
-    }
-    
-    /**
-     * Clears out any required validation on the fields within an entity form. Used for additional Skus since none of those
-     * fields should be required.
-     * 
-     * @param entityForm
-     */
-    protected void removeRequiredValidation(EntityForm entityForm) {
-        for (Field field : entityForm.getFields().values()) {
-            field.setRequired(false);
-        }
     }
     
 }

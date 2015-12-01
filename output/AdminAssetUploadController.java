@@ -26,10 +26,12 @@ import org.broadleafcommerce.cms.file.service.StaticAssetStorageService;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
 import org.broadleafcommerce.openadmin.server.service.handler.CustomPersistenceHandler;
 import org.broadleafcommerce.openadmin.web.controller.AdminAbstractController;
+import org.broadleafcommerce.openadmin.web.controller.modal.ModalHeaderType;
 import org.broadleafcommerce.openadmin.web.form.component.ListGrid;
 import org.broadleafcommerce.openadmin.web.form.component.ListGrid.Type;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -92,7 +94,7 @@ public class AdminAssetUploadController extends AdminAbstractController {
         
         model.addAttribute("viewType", "modal/selectAsset");
         model.addAttribute("currentUrl", request.getRequestURL().toString());
-        model.addAttribute("modalHeaderType", "selectAsset");
+        model.addAttribute("modalHeaderType", ModalHeaderType.SELECT_ASSET.getType());
 
         model.addAttribute("currentParams", new ObjectMapper().writeValueAsString(requestParams));
         
@@ -102,7 +104,7 @@ public class AdminAssetUploadController extends AdminAbstractController {
         return "modules/modalContainer";
     }
     
-    @RequestMapping(value = "/{id}/uploadAsset", method = RequestMethod.POST)
+    @RequestMapping(value = "/{id}/uploadAsset", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> upload(HttpServletRequest request,
             @RequestParam("file") MultipartFile file, 
             @PathVariable(value="sectionKey") String sectionKey, @PathVariable(value="id") String id) throws IOException {
@@ -137,22 +139,23 @@ public class AdminAssetUploadController extends AdminAbstractController {
         responseHeaders.add("Content-Type", "text/html; charset=utf-8");
         return new ResponseEntity<Map<String, Object>>(responseMap, responseHeaders, HttpStatus.OK);
     }
-    
-    @RequestMapping(value = "/uploadAsset", method = RequestMethod.POST)
+
     /**
      * Used by the Asset list view to upload an asset and then immediately show the
      * edit form for that record.
-     * 
+     *
      * @param request
      * @param file
      * @param sectionKey
      * @return
      * @throws IOException
      */
-    public String upload(HttpServletRequest request,
-            @RequestParam("file") MultipartFile file,
-            @PathVariable(value="sectionKey") String sectionKey) throws IOException {
-        
+    @RequestMapping(value = "/uploadAsset", method = RequestMethod.POST)
+    public String upload(HttpServletRequest request, HttpServletResponse response, Model model,
+                         @PathVariable Map<String, String> pathVars,
+                         @RequestParam("file") MultipartFile file,
+                         @RequestParam MultiValueMap<String, String> requestParams) throws Exception {
+
         StaticAsset staticAsset = staticAssetService.createStaticAssetFromFile(file, null);
         staticAssetStorageService.createStaticAssetStorageFromFile(file, staticAsset);
 
@@ -160,8 +163,26 @@ public class AdminAssetUploadController extends AdminAbstractController {
         if (staticAssetUrlPrefix != null && !staticAssetUrlPrefix.startsWith("/")) {
             staticAssetUrlPrefix = "/" + staticAssetUrlPrefix;
         }
-        
-        return "redirect:/assets/" + staticAsset.getId();
-    }    
 
+        return "redirect:/assets/" + staticAsset.getId();
+    }
+
+    @RequestMapping(value = "/{addlSectionKey}/{id}/chooseAsset", method = RequestMethod.GET)
+    public String chooseMediaForMapKey(HttpServletRequest request, HttpServletResponse response, Model model,
+            @PathVariable(value = "sectionKey") String sectionKey,
+            @PathVariable(value = "addlSectionKey") String addlSectionKey,
+            @PathVariable(value = "id") String id,
+            @RequestParam MultiValueMap<String, String> requestParams) throws Exception {
+        return chooseMediaForMapKey(request, response, model, sectionKey, id, requestParams);
+    }
+
+    @RequestMapping(value = "/{addlSectionKey}/{id}/uploadAsset",
+            method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> upload(HttpServletRequest request,
+            @RequestParam("file") MultipartFile file,            
+            @PathVariable(value = "sectionKey") String sectionKey,
+            @PathVariable(value = "addlSectionKey") String addlSectionKey,
+            @PathVariable(value = "id") String id) throws IOException {
+        return upload(request, file, sectionKey, id);
+    }
 }

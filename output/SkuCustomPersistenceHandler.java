@@ -22,7 +22,6 @@ package org.broadleafcommerce.admin.server.service.handler;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Transformer;
-import org.apache.commons.collections4.map.LRUMap;
 import org.apache.commons.lang.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -32,6 +31,10 @@ import org.broadleafcommerce.common.presentation.client.OperationType;
 import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.util.BLCCollectionUtils;
+import org.broadleafcommerce.common.util.EfficientLRUMap;
+import org.broadleafcommerce.common.util.TypedTransformer;
+import org.broadleafcommerce.common.util.dao.DynamicDaoHelperImpl;
 import org.broadleafcommerce.core.catalog.domain.Product;
 import org.broadleafcommerce.core.catalog.domain.ProductOption;
 import org.broadleafcommerce.core.catalog.domain.ProductOptionValue;
@@ -63,6 +66,7 @@ import org.broadleafcommerce.openadmin.server.service.persistence.module.criteri
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.FilterMapping;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.Restriction;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.predicate.PredicateProvider;
+import org.hibernate.ejb.HibernateEntityManager;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -70,12 +74,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Resource;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.From;
 import javax.persistence.criteria.Path;
@@ -100,8 +106,8 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
 
     protected long lastCacheFlushTime = System.currentTimeMillis();
 
-    protected static final Map<String,Map<String, FieldMetadata>> METADATA_CACHE = Collections.synchronizedMap(new
-            LRUMap<String, Map<String, FieldMetadata>>(100, 1000));
+    protected static final Map<String, Map<String, FieldMetadata>> METADATA_CACHE =
+            new EfficientLRUMap<String, Map<String, FieldMetadata>>(1000);
 
     @Resource(name="blAdornedTargetListPersistenceModule")
     protected PersistenceModule adornedPersistenceModule;
@@ -119,6 +125,9 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
 
     @Resource(name="blCatalogService")
     protected CatalogService catalogService;
+    
+    @PersistenceContext(unitName = "blPU")
+    protected EntityManager em;
 
     @Override
     public Boolean canHandleInspect(PersistencePackage persistencePackage) {
@@ -253,7 +262,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
                 filterOutProductMetadata(entry.getValue());
             }
 
-            ClassMetadata mergedMetadata = helper.getMergedClassMetadata(entityClasses, allMergedProperties);
+            ClassMetadata mergedMetadata = helper.buildClassMetadata(entityClasses, persistencePackage, allMergedProperties);
             DynamicResultSet results = new DynamicResultSet(mergedMetadata, null, null);
 
             return results;
@@ -291,12 +300,13 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
      * display this field with a different entity then this should be that entity
      * @return
      */
-    public static FieldMetadata createConsolidatedOptionField(Class<?> inheritedFromType) {
+    public FieldMetadata createConsolidatedOptionField(Class<?> inheritedFromType) {
         BasicFieldMetadata metadata = new BasicFieldMetadata();
         metadata.setFieldType(SupportedFieldType.STRING);
         metadata.setMutable(false);
         metadata.setInheritedFromType(inheritedFromType.getName());
-        metadata.setAvailableToTypes(new String[] { SkuImpl.class.getName() });
+        
+        metadata.setAvailableToTypes(getPolymorphicClasses(SkuImpl.class));
         metadata.setForeignKeyCollection(false);
         metadata.setMergedPropertyType(MergedPropertyType.PRIMARY);
 
@@ -314,6 +324,19 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
         return metadata;
     }
 
+    protected String[] getPolymorphicClasses(Class<?> clazz) {
+        DynamicDaoHelperImpl helper = new DynamicDaoHelperImpl();
+        Class<?>[] classes = helper.getAllPolymorphicEntitiesFromCeiling(clazz,
+                helper.getSessionFactory((HibernateEntityManager) em), 
+                true,
+                useCache());
+        String[] result = new String[classes.length];
+        for (int i = 0; i < classes.length; i++) {
+            result[i] = classes[i].getName();
+        }
+        return result;
+    }
+    
     /**
      * Returns a {@link Property} filled out with a delimited list of the <b>values</b> that are passed in. This should be
      * invoked on a fetch and the returned property should be added to the fetched {@link Entity} dto.
@@ -322,7 +345,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
      * @return
      * @see {@link #createConsolidatedOptionField(Class)};
      */
-    public static Property getConsolidatedOptionProperty(Collection<ProductOptionValue> values) {
+    public Property getConsolidatedOptionProperty(Collection<ProductOptionValue> values) {
         Property optionValueProperty = new Property();
         optionValueProperty.setName(CONSOLIDATED_PRODUCT_OPTIONS_FIELD_NAME);
 
@@ -352,7 +375,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
     /**
      * @return a blank {@link Property} corresponding to the CONSOLIDATED_PRODUCT_OPTIONS_FIELD_NAME
      */
-    public static Property getBlankConsolidatedOptionProperty() {
+    public Property getBlankConsolidatedOptionProperty() {
         Property optionValueProperty = new Property();
         optionValueProperty.setName(CONSOLIDATED_PRODUCT_OPTIONS_FIELD_NAME);
         optionValueProperty.setValue("");
@@ -370,7 +393,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
      * @param order
      * @return
      */
-    public static FieldMetadata createIndividualOptionField(ProductOption option, int order) {
+    public FieldMetadata createIndividualOptionField(ProductOption option, int order) {
 
         BasicFieldMetadata metadata = new BasicFieldMetadata();
         List<ProductOptionValue> allowedValues = option.getAllowedValues();
@@ -378,7 +401,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
             metadata.setFieldType(SupportedFieldType.EXPLICIT_ENUMERATION);
             metadata.setMutable(true);
             metadata.setInheritedFromType(SkuImpl.class.getName());
-            metadata.setAvailableToTypes(new String[] { SkuImpl.class.getName() });
+            metadata.setAvailableToTypes(getPolymorphicClasses(SkuImpl.class));
             metadata.setForeignKeyCollection(false);
             metadata.setMergedPropertyType(MergedPropertyType.PRIMARY);
     
@@ -435,7 +458,13 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
                 Sku sku = (Sku) records.get(i);
                 Entity entity = payload[i];
 
-                List<ProductOptionValue> optionValues = sku.getProductOptionValues();
+                List<ProductOptionValue> optionValues = BLCCollectionUtils.collectList(sku.getProductOptionValueXrefs(), new TypedTransformer<ProductOptionValue>() {
+                    @Override
+                    public ProductOptionValue transform(Object input) {
+                        return ((SkuProductOptionValueXref) input).getProductOptionValue();
+                    }
+                });
+
                 for (ProductOptionValue value : optionValues) {
                     Property optionProperty = new Property();
                     optionProperty.setName(PRODUCT_OPTION_FIELD_PREFIX + value.getProductOption().getId());
@@ -456,7 +485,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
         }
     }
 
-    public static void applyProductOptionValueCriteria(List<FilterMapping> filterMappings, CriteriaTransferObject cto, PersistencePackage persistencePackage, String skuPropertyPrefix) {
+    public void applyProductOptionValueCriteria(List<FilterMapping> filterMappings, CriteriaTransferObject cto, PersistencePackage persistencePackage, String skuPropertyPrefix) {
 
         //if the front
         final List<Long> productOptionValueFilterIDs = new ArrayList<Long>();
@@ -595,7 +624,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
             }
             return result;
         } catch (Exception e) {
-            throw new ServiceException("Unable to perform fetch for entity: " + Sku.class.getName(), e);
+            throw new ServiceException("Unable to perform update for entity: " + Sku.class.getName(), e);
         }
     }
 
@@ -616,7 +645,10 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
 
         //remove the current list of product option values from the Sku
         if (adminInstance.getProductOptionValueXrefs().size() > 0) {
-            adminInstance.getProductOptionValueXrefs().clear();
+            Iterator<SkuProductOptionValueXref> iterator = adminInstance.getProductOptionValueXrefs().iterator();
+            while (iterator.hasNext()) {
+                dynamicEntityDao.remove(iterator.next());
+            }
             dynamicEntityDao.merge(adminInstance);
         }
 

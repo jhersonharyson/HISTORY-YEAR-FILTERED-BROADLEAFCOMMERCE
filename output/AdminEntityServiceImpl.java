@@ -19,13 +19,18 @@
  */
 package org.broadleafcommerce.openadmin.server.service;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.admin.domain.AdminMainEntity;
 import org.broadleafcommerce.common.dao.GenericEntityDao;
 import org.broadleafcommerce.common.exception.ServiceException;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
 import org.broadleafcommerce.common.presentation.client.AddMethodType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
+import org.broadleafcommerce.common.util.BLCMessageUtils;
+import org.broadleafcommerce.common.util.BLCSystemProperty;
 import org.broadleafcommerce.common.util.dao.DynamicDaoHelper;
 import org.broadleafcommerce.common.util.dao.DynamicDaoHelperImpl;
 import org.broadleafcommerce.openadmin.dto.AdornedTargetCollectionMetadata;
@@ -39,11 +44,14 @@ import org.broadleafcommerce.openadmin.dto.DynamicResultSet;
 import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.FieldMetadata;
 import org.broadleafcommerce.openadmin.dto.FilterAndSortCriteria;
+import org.broadleafcommerce.openadmin.dto.GroupMetadata;
 import org.broadleafcommerce.openadmin.dto.MapMetadata;
 import org.broadleafcommerce.openadmin.dto.MapStructure;
 import org.broadleafcommerce.openadmin.dto.PersistencePackage;
 import org.broadleafcommerce.openadmin.dto.Property;
 import org.broadleafcommerce.openadmin.dto.SectionCrumb;
+import org.broadleafcommerce.openadmin.dto.TabMetadata;
+import org.broadleafcommerce.openadmin.exception.EntityNotFoundException;
 import org.broadleafcommerce.openadmin.server.domain.PersistencePackageRequest;
 import org.broadleafcommerce.openadmin.server.factory.PersistencePackageFactory;
 import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceResponse;
@@ -51,8 +59,9 @@ import org.broadleafcommerce.openadmin.server.service.persistence.module.BasicPe
 import org.broadleafcommerce.openadmin.web.form.entity.DynamicEntityFormInfo;
 import org.broadleafcommerce.openadmin.web.form.entity.EntityForm;
 import org.broadleafcommerce.openadmin.web.form.entity.Field;
+import org.broadleafcommerce.openadmin.web.form.entity.Tab;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,7 +73,6 @@ import java.util.Map.Entry;
 
 import javax.annotation.Resource;
 import javax.persistence.EntityManager;
-import javax.persistence.NoResultException;
 import javax.persistence.PersistenceContext;
 
 /**
@@ -72,6 +80,8 @@ import javax.persistence.PersistenceContext;
  */
 @Service("blAdminEntityService")
 public class AdminEntityServiceImpl implements AdminEntityService {
+
+    protected static final Log LOG = LogFactory.getLog(AdminEntityServiceImpl.class);
 
     @Resource(name = "blDynamicEntityRemoteService")
     protected DynamicEntityService service;
@@ -113,10 +123,12 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         FilterAndSortCriteria fasc = new FilterAndSortCriteria(idProperty);
         fasc.setFilterValue(id);
         request.addFilterAndSortCriteria(fasc);
-
+        
         PersistenceResponse response = fetch(request);
         Entity[] entities = response.getDynamicResultSet().getRecords();
-        Assert.isTrue(entities != null && entities.length == 1, "Entity not found");
+        if (ArrayUtils.isEmpty(entities)) {
+            throw new EntityNotFoundException();
+        }
 
         return response;
     }
@@ -196,7 +208,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         return properties;
     }
 
-    protected PersistencePackageRequest getRequestForEntityForm(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumbs) {
+    public PersistencePackageRequest getRequestForEntityForm(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumbs) {
         // Ensure the ID property is on the form
         Field idField = entityForm.getFields().get(entityForm.getIdProperty());
         if (idField == null) {
@@ -218,7 +230,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         if (StringUtils.isEmpty(entityType)) {
             entityType = entityForm.getCeilingEntityClassname();
         }
-        entity.setType(new String[] { entityType });
+        entity.setType(new String[]{entityType});
 
         PersistencePackageRequest ppr = PersistencePackageRequest.standard()
                 .withEntity(entity)
@@ -233,10 +245,19 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     public PersistenceResponse getAdvancedCollectionRecord(ClassMetadata containingClassMetadata, Entity containingEntity,
             Property collectionProperty, String collectionItemId, List<SectionCrumb> sectionCrumbs, String alternateId)
             throws ServiceException {
+        return getAdvancedCollectionRecord(containingClassMetadata, containingEntity, collectionProperty, collectionItemId, sectionCrumbs, alternateId, null);
+    }
+
+    @Override
+    public PersistenceResponse getAdvancedCollectionRecord(ClassMetadata containingClassMetadata, Entity containingEntity,
+            Property collectionProperty, String collectionItemId, List<SectionCrumb> sectionCrumbs, String alternateId,
+            String[] customCriteria) throws ServiceException {
         PersistencePackageRequest ppr = PersistencePackageRequest.fromMetadata(collectionProperty.getMetadata(), sectionCrumbs);
 
+        ppr.addCustomCriteria(customCriteria);
+
         FieldMetadata md = collectionProperty.getMetadata();
-        String containingEntityId = getContextSpecificRelationshipId(containingClassMetadata, containingEntity, 
+        String containingEntityId = getContextSpecificRelationshipId(containingClassMetadata, containingEntity,
                 collectionProperty.getName());
         ppr.setSectionEntityField(collectionProperty.getName());
 
@@ -259,7 +280,9 @@ public class AdminEntityServiceImpl implements AdminEntityService {
 
             response = fetch(ppr);
             Entity[] entities = response.getDynamicResultSet().getRecords();
-            Assert.isTrue(entities != null && entities.length == 1, "Entity not found");
+            if (ArrayUtils.isEmpty(entities)) {
+                throw new EntityNotFoundException();
+            }
         } else if (md instanceof MapMetadata) {
             MapMetadata mmd = (MapMetadata) md;
             FilterAndSortCriteria fasc = new FilterAndSortCriteria(ppr.getForeignKey().getManyToField());
@@ -282,12 +305,6 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         } else {
             throw new IllegalArgumentException(String.format("The specified field [%s] for class [%s] was not an " +
                     "advanced collection field.", collectionProperty.getName(), containingClassMetadata.getCeilingType()));
-        }
-
-        if (response == null) {
-            throw new NoResultException(String.format("Could not find record for class [%s], field [%s], main entity id " +
-                    "[%s], collection entity id [%s]", containingClassMetadata.getCeilingType(),
-                    collectionProperty.getName(), containingEntityId, collectionItemId));
         }
 
         return response;
@@ -347,15 +364,16 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     }
 
     @Override
-    public Map<String, DynamicResultSet> getRecordsForAllSubCollections(PersistencePackageRequest ppr, Entity containingEntity, List<SectionCrumb> sectionCrumb)
+    public Map<String, DynamicResultSet> getRecordsForAllSubCollections(PersistencePackageRequest ppr, Entity containingEntity, Integer startIndex, Integer maxIndex, List<SectionCrumb> sectionCrumb)
             throws ServiceException {
         Map<String, DynamicResultSet> map = new HashMap<String, DynamicResultSet>();
 
         PersistenceResponse response = getClassMetadata(ppr);
         ClassMetadata cmd = response.getDynamicResultSet().getClassMetaData();
         for (Property p : cmd.getProperties()) {
-            if (p.getMetadata() instanceof CollectionMetadata) {
-                PersistenceResponse response2 = getRecordsForCollection(cmd, containingEntity, p, null, null, null, sectionCrumb);
+            if (ArrayUtils.contains(p.getMetadata().getAvailableToTypes(), containingEntity.getType()[0])
+                    && p.getMetadata() instanceof CollectionMetadata) {
+                PersistenceResponse response2 = getRecordsForCollection(cmd, containingEntity, p, null, startIndex, maxIndex, sectionCrumb);
                 map.put(p.getName(), response2.getDynamicResultSet());
             }
         }
@@ -363,6 +381,84 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         return map;
     }
 
+    @Override
+    public Map<String, DynamicResultSet> getRecordsForAllSubCollections(PersistencePackageRequest ppr, Entity containingEntity, List<SectionCrumb> sectionCrumb)
+            throws ServiceException {
+
+        return getRecordsForAllSubCollections(ppr, containingEntity, null, null, sectionCrumb);
+    }
+
+    @Override
+    public Map<String, DynamicResultSet> getRecordsForSelectedTab(ClassMetadata cmd, Entity containingEntity, List<SectionCrumb> sectionCrumb,
+            String currentTabName) throws ServiceException {
+        Map<String, DynamicResultSet> map = new HashMap<String, DynamicResultSet>();
+        for (Property p : cmd.getProperties()) {
+            if (ArrayUtils.contains(p.getMetadata().getAvailableToTypes(), containingEntity.getType()[0])
+                    && p.getMetadata() instanceof CollectionMetadata) {
+
+                CollectionMetadata collectionMetadata = (CollectionMetadata) p.getMetadata();
+                TabMetadata tabMetadata = cmd.getTabMetadataUsingTabKey(collectionMetadata.getTab());
+                if (tabMetadata == null) {
+                    tabMetadata = cmd.getTabMetadataUsingGroupKey(collectionMetadata.getGroup());
+                }
+
+                String tabName = tabMetadata == null ? collectionMetadata.getTab() : tabMetadata.getTabName();
+                int tabOrder = tabMetadata == null ? collectionMetadata.getTabOrder() : tabMetadata.getTabOrder();
+                updateTabInfo(collectionMetadata, cmd, tabName, tabOrder);
+
+                if (collectionMetadata.getLazyFetch() != null && collectionMetadata.getLazyFetch()
+                        && tabName.toUpperCase().startsWith(currentTabName.toUpperCase())) {
+                    PersistenceResponse response2 = getRecordsForCollection(cmd, containingEntity, p, null, null, null, sectionCrumb);
+                    map.put(p.getName(), response2.getDynamicResultSet());
+                } else if (collectionMetadata.getLazyFetch() != null && !collectionMetadata.getLazyFetch()) {
+                    PersistenceResponse response2 = getRecordsForCollection(cmd, containingEntity, p, null, null, null, sectionCrumb);
+                    map.put(p.getName(), response2.getDynamicResultSet());
+                } else {
+                    DynamicResultSet drs = new DynamicResultSet();
+                    Map<String, Tab> tabMap = new HashMap<String, Tab>();
+                    Tab tab = new Tab();
+                    tab.setKey(tabName);
+                    tab.setTitle(BLCMessageUtils.getMessage(tabName));
+                    tab.setOrder(tabOrder);
+                    tabMap.put(tab.getTitle(), tab);
+                    drs.setUnselectedTabMetadata(tabMap);
+                    drs.setTotalRecords(0);
+                    drs.setStartIndex(0);
+                    drs.setBatchId(1);
+                    drs.setClassMetaData(null);
+                    drs.setPageSize(1);
+                    drs.setRecords(new Entity[0]);
+                    map.put(p.getName(), drs);
+                }
+            }
+        }
+
+        return map;
+    }
+
+    protected void updateTabInfo(CollectionMetadata fmd, ClassMetadata cmd, String tabName, int tabOrder) {
+        boolean tabInfoFound = false;
+        Map<String, TabMetadata> tabMetadataMap = cmd.getTabAndGroupMetadata();
+        for (String tabKey : tabMetadataMap.keySet()) {
+            Map<String, GroupMetadata> groupMetadataMap = tabMetadataMap.get(tabKey).getGroupMetadata();
+            for (String groupKey : groupMetadataMap.keySet()) {
+                if (groupKey.equals(fmd.getGroup()) || groupMetadataMap.get(groupKey).getGroupName().equals(fmd.getGroup())) {
+                    tabName = tabMetadataMap.get(tabKey).getTabName();
+                    tabOrder = tabMetadataMap.get(tabKey).getTabOrder();
+                    tabInfoFound = true;
+                    break;
+                }
+            }
+            if (tabInfoFound) {
+                break;
+            }
+            if (tabKey.equals(tabName) || tabMetadataMap.get(tabKey).getTabName().equals(tabName)) {
+                tabName = tabMetadataMap.get(tabKey).getTabName();
+                tabOrder = tabMetadataMap.get(tabKey).getTabOrder();
+            }
+        }
+    }
+    
     @Override
     public PersistenceResponse addSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field,
             Entity parentEntity, List<SectionCrumb> sectionCrumbs)
@@ -702,6 +798,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         return add(request, true);
     }
     
+    @Override
     public PersistenceResponse add(PersistencePackageRequest request, boolean transactional) throws ServiceException {
         PersistencePackage pkg = persistencePackageFactory.create(request);
         try {
@@ -725,6 +822,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 }
             }
         } catch (ValidationException e) {
+            ensureEntityMarkedAsValidationFailure(e, request);
             return new PersistenceResponse().withEntity(e.getEntity());
         }
     }
@@ -734,6 +832,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         return update(request, true);
     }
     
+    @Override
     public PersistenceResponse update(PersistencePackageRequest request, boolean transactional) throws ServiceException {
         PersistencePackage pkg = persistencePackageFactory.create(request);
         try {
@@ -743,6 +842,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 return service.nonTransactionalUpdate(pkg);
             }
         } catch (ValidationException e) {
+            ensureEntityMarkedAsValidationFailure(e, request);
             return new PersistenceResponse().withEntity(e.getEntity());
         }
     }
@@ -760,6 +860,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         return remove(request, true);
     }
 
+    @Override
     public PersistenceResponse remove(PersistencePackageRequest request, boolean transactional) throws ServiceException {
         PersistencePackage pkg = persistencePackageFactory.create(request);
         try {
@@ -769,7 +870,25 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 return service.nonTransactionalRemove(pkg);
             }
         } catch (ValidationException e) {
+            ensureEntityMarkedAsValidationFailure(e, request);
             return new PersistenceResponse().withEntity(e.getEntity());
+        }
+    }
+    
+    /**
+     * <p>
+     * Should be invoked when a {@link ValidationException} is thrown to verify that the {@link Entity} contained within the
+     * given <b>originalRequest</b> has a validationFailure = true
+     * 
+     * <p>
+     * This will also check for a cause of {@link ConstraintViolationException} and add a gloal error to that.
+     */
+    protected void ensureEntityMarkedAsValidationFailure(ValidationException e, PersistencePackageRequest originalRequest) {
+        if (e.containsCause(ConstraintViolationException.class)) {
+            e.getEntity().addGlobalValidationError("constraintViolationError");
+        } else if (!e.getEntity().isValidationFailure()) {
+            e.getEntity().setValidationFailure(true);
+            e.getEntity().addGlobalValidationError(e.getMessage());
         }
     }
 
@@ -801,7 +920,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     
     protected CriteriaTransferObject getDefaultCto() {
         CriteriaTransferObject cto = new CriteriaTransferObject();
-        cto.setMaxResults(50);
+        cto.setMaxResults(getDefaultMaxResults());
         return cto;
     }
     
@@ -819,6 +938,10 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         }
         
         return null;
+    }
+    
+    protected int getDefaultMaxResults() {
+        return BLCSystemProperty.resolveIntSystemProperty("admin.default.max.results", 50);
     }
 
 }

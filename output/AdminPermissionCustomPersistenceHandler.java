@@ -17,6 +17,7 @@
  * limitations under the License.
  * #L%
  */
+
 package org.broadleafcommerce.openadmin.server.security.handler;
 
 import org.apache.commons.lang.ArrayUtils;
@@ -62,7 +63,7 @@ public class AdminPermissionCustomPersistenceHandler extends CustomPersistenceHa
     public Boolean canHandleUpdate(PersistencePackage persistencePackage) {
         return canHandleAdd(persistencePackage);
     }
-    
+
     @Override
     public Boolean canHandleFetch(PersistencePackage persistencePackage) {
         String ceilingEntityFullyQualifiedClassname = persistencePackage.getCeilingEntityFullyQualifiedClassname();
@@ -82,7 +83,7 @@ public class AdminPermissionCustomPersistenceHandler extends CustomPersistenceHa
             Map<String, FieldMetadata> adminProperties = helper.getSimpleMergedProperties(AdminPermission.class.getName(), persistencePerspective);
             adminInstance = (AdminPermission) helper.createPopulatedInstance(adminInstance, entity, adminProperties, false);
 
-            adminInstance = (AdminPermission) dynamicEntityDao.merge(adminInstance);
+            adminInstance = dynamicEntityDao.merge(adminInstance);
 
             Entity adminEntity = helper.getRecord(adminProperties, adminInstance, null, null);
 
@@ -93,7 +94,7 @@ public class AdminPermissionCustomPersistenceHandler extends CustomPersistenceHa
     }
 
     protected Entity checkPermissionName(PersistencePackage persistencePackage) throws ServiceException {
-        Entity entity  = persistencePackage.getEntity();
+        Entity entity = persistencePackage.getEntity();
         Property prop = entity.findProperty("name");
         String name = prop.getValue();
         name = name.toUpperCase();
@@ -121,7 +122,7 @@ public class AdminPermissionCustomPersistenceHandler extends CustomPersistenceHa
             AdminPermission adminInstance = (AdminPermission) dynamicEntityDao.retrieve(Class.forName(entity.getType()[0]), primaryKey);
             adminInstance = (AdminPermission) helper.createPopulatedInstance(adminInstance, entity, adminProperties, false);
 
-            adminInstance = (AdminPermission) dynamicEntityDao.merge(adminInstance);
+            adminInstance = dynamicEntityDao.merge(adminInstance);
 
             Entity adminEntity = helper.getRecord(adminProperties, adminInstance, null, null);
 
@@ -138,14 +139,14 @@ public class AdminPermissionCustomPersistenceHandler extends CustomPersistenceHa
 
         PersistenceModule myModule = helper.getCompatibleModule(persistencePackage.getPersistencePerspective().getOperationTypes().getFetchType());
         DynamicResultSet results = myModule.fetch(persistencePackage, cto);
-        
+
         return results;
     }
-    
+
     protected void addFriendlyRestriction(CriteriaTransferObject cto) {
-        cto.add(new FilterAndSortCriteria("isFriendly", "true"));
+        cto.add(new FilterAndSortCriteria("isFriendly", "true", cto.getCriteriaMap().size()));
     }
-    
+
     protected void addDefaultSort(CriteriaTransferObject cto) {
         boolean userSort = false;
         for (FilterAndSortCriteria fasc : cto.getCriteriaMap().values()) {
@@ -155,10 +156,13 @@ public class AdminPermissionCustomPersistenceHandler extends CustomPersistenceHa
             }
         }
         if (!userSort) {
-            FilterAndSortCriteria sortFasc = new FilterAndSortCriteria("description");
-            sortFasc.setSortAscending(true);
-            cto.add(sortFasc);
+            FilterAndSortCriteria descriptionSort = cto.getCriteriaMap().get("description");
+            if (descriptionSort == null) {
+                descriptionSort = new FilterAndSortCriteria("description");
+                cto.add(descriptionSort);
+            }
+            descriptionSort.setSortAscending(true);
         }
     }
-    
+
 }

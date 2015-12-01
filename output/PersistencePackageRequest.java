@@ -31,10 +31,12 @@ import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.FieldMetadata;
 import org.broadleafcommerce.openadmin.dto.FilterAndSortCriteria;
 import org.broadleafcommerce.openadmin.dto.ForeignKey;
+import org.broadleafcommerce.openadmin.dto.GroupMetadata;
 import org.broadleafcommerce.openadmin.dto.MapMetadata;
 import org.broadleafcommerce.openadmin.dto.MapStructure;
 import org.broadleafcommerce.openadmin.dto.OperationTypes;
 import org.broadleafcommerce.openadmin.dto.SectionCrumb;
+import org.broadleafcommerce.openadmin.dto.TabMetadata;
 import org.broadleafcommerce.openadmin.dto.visitor.MetadataVisitor;
 
 import java.util.ArrayList;
@@ -68,6 +70,7 @@ public class PersistencePackageRequest {
     protected Map<String, PersistencePackageRequest> subRequests = new LinkedHashMap<String, PersistencePackageRequest>();
     protected boolean validateUnsubmittedProperties = true;
     protected boolean isUpdateLookupType = false;
+    protected boolean isTreeCollection = false;
 
     protected OperationTypes operationTypesOverride = null;
 
@@ -100,7 +103,7 @@ public class PersistencePackageRequest {
     }
 
     /**
-     * Creates a semi-populate PersistencePacakageRequest based on the specified FieldMetadata. This initializer
+     * Creates a semi-populate PersistencePacakageRequest based on the specified Metadata. This initializer
      * will copy over persistence perspective items from the metadata as well as set the appropriate OperationTypes
      * as specified in the annotation/xml configuration for the field.
      * 
@@ -157,6 +160,18 @@ public class PersistencePackageRequest {
                 request.setMapStructure(mapStructure);
                 request.setForeignKey(foreignKey);
                 request.setCustomCriteria(fmd.getCustomCriteria());
+            }
+
+            @Override
+            public void visit(GroupMetadata gmd) {
+                request.setType(Type.STANDARD);
+                request.setCeilingEntityClassname(gmd.getOwningClass());
+            }
+
+            @Override
+            public void visit(TabMetadata tmd) {
+                request.setType(Type.STANDARD);
+                request.setCeilingEntityClassname(tmd.getOwningClass());
             }
         });
         
@@ -288,12 +303,24 @@ public class PersistencePackageRequest {
 
     public PersistencePackageRequest addCustomCriteria(String customCriteria) {
         if (this.customCriteria == null) {
-            this.customCriteria = new ArrayList<String>();
+            this.customCriteria = new ArrayList<>();
         }
         
         if (StringUtils.isNotBlank(customCriteria)) {
             this.customCriteria.add(customCriteria);
         }
+        return this;
+    }
+
+    public PersistencePackageRequest addCustomCriteria(String[] customCriteriaList) {
+        if (customCriteriaList != null && customCriteriaList.length > 0) {
+            if (this.customCriteria == null) {
+                this.customCriteria = new ArrayList<>(Arrays.asList(customCriteriaList));
+            } else {
+                this.customCriteria.addAll(new ArrayList<>(Arrays.asList(customCriteriaList)));
+            }
+        }
+
         return this;
     }
 
@@ -325,6 +352,15 @@ public class PersistencePackageRequest {
             if (fasc.getPropertyId().equals(name)) {
                 it.remove();
             }
+        }
+        return this;
+    }
+
+    public PersistencePackageRequest clearFilterAndSortCriteria() {
+        Iterator<FilterAndSortCriteria> it = filterAndSortCriteria.listIterator();
+        while (it.hasNext()) {
+            it.next();
+            it.remove();
         }
         return this;
     }
@@ -523,5 +559,12 @@ public class PersistencePackageRequest {
     public void setUpdateLookupType(boolean isUpdateLookupType) {
         this.isUpdateLookupType = isUpdateLookupType;
     }
-    
+
+    public boolean isTreeCollection() {
+        return isTreeCollection;
+    }
+
+    public void setIsTreeCollection(boolean isTreeCollection) {
+        this.isTreeCollection = isTreeCollection;
+    }
 }

@@ -33,18 +33,13 @@ import org.broadleafcommerce.common.locale.domain.Locale;
 import org.broadleafcommerce.common.locale.domain.LocaleImpl;
 import org.broadleafcommerce.common.presentation.AdminPresentation;
 import org.broadleafcommerce.common.presentation.AdminPresentationClass;
-import org.broadleafcommerce.common.presentation.AdminPresentationMapField;
-import org.broadleafcommerce.common.presentation.AdminPresentationMapFields;
 import org.broadleafcommerce.common.presentation.AdminPresentationToOneLookup;
 import org.broadleafcommerce.common.presentation.PopulateToOneFieldsEnum;
 import org.broadleafcommerce.common.presentation.RequiredOverride;
-import org.broadleafcommerce.common.presentation.RuleIdentifier;
 import org.broadleafcommerce.common.presentation.client.LookupType;
-import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
 import org.broadleafcommerce.common.presentation.override.AdminPresentationOverride;
 import org.broadleafcommerce.common.presentation.override.AdminPresentationOverrides;
-import org.broadleafcommerce.openadmin.audit.AdminAuditable;
 import org.broadleafcommerce.openadmin.audit.AdminAuditableListener;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.Cache;
@@ -64,7 +59,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
-import javax.persistence.Embedded;
 import javax.persistence.Entity;
 import javax.persistence.EntityListeners;
 import javax.persistence.FetchType;
@@ -107,8 +101,7 @@ import javax.persistence.Transient;
         @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE)
 })
 @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
-@ProfileEntity
-public class StructuredContentImpl implements StructuredContent, AdminMainEntity {
+public class StructuredContentImpl implements StructuredContent, AdminMainEntity, ProfileEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -124,10 +117,6 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     )
     @Column(name = "SC_ID")
     protected Long id;
-
-    @Embedded
-    @AdminPresentation(excluded = true)
-    protected AdminAuditable auditable = new AdminAuditable();
 
     @AdminPresentation(friendlyName = "StructuredContentImpl_Content_Name", order = 1, 
         group = Presentation.Group.Name.Description, groupOrder = Presentation.Group.Order.Description,
@@ -154,52 +143,6 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     @JoinTable(name = "BLC_SC_RULE_MAP", inverseJoinColumns = @JoinColumn(name = "SC_RULE_ID", referencedColumnName = "SC_RULE_ID"))
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
     @MapKeyColumn(name = "MAP_KEY", nullable = false)
-    @AdminPresentationMapFields(
-        mapDisplayFields = {
-            @AdminPresentationMapField(
-                fieldName = RuleIdentifier.CUSTOMER_FIELD_KEY,
-                fieldPresentation = @AdminPresentation(fieldType = SupportedFieldType.RULE_SIMPLE, order = 1,
-                    tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-                    group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-                    ruleIdentifier = RuleIdentifier.CUSTOMER, friendlyName = "Generic_Customer_Rule")
-            ),
-            @AdminPresentationMapField(
-                fieldName = RuleIdentifier.TIME_FIELD_KEY,
-                fieldPresentation = @AdminPresentation(fieldType = SupportedFieldType.RULE_SIMPLE, order = 2,
-                    tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-                    group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-                    ruleIdentifier = RuleIdentifier.TIME, friendlyName = "Generic_Time_Rule")
-            ),
-            @AdminPresentationMapField(
-                fieldName = RuleIdentifier.REQUEST_FIELD_KEY,
-                fieldPresentation = @AdminPresentation(fieldType = SupportedFieldType.RULE_SIMPLE, order = 3,
-                    tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-                    group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-                    ruleIdentifier = RuleIdentifier.REQUEST, friendlyName = "Generic_Request_Rule")
-            ),
-            @AdminPresentationMapField(
-                fieldName = RuleIdentifier.PRODUCT_FIELD_KEY,
-                fieldPresentation = @AdminPresentation(fieldType = SupportedFieldType.RULE_SIMPLE, order = 4,
-                    tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-                    group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-                    ruleIdentifier = RuleIdentifier.PRODUCT, friendlyName = "Generic_Product_Rule")
-                    ),
-            @AdminPresentationMapField(
-                fieldName = RuleIdentifier.ORDER_FIELD_KEY,
-                fieldPresentation = @AdminPresentation(fieldType = SupportedFieldType.RULE_SIMPLE, order = 5,
-                    tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-                    group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-                    ruleIdentifier = RuleIdentifier.ORDER, friendlyName = "Generic_Order_Rule")
-                    ),
-            @AdminPresentationMapField(
-                fieldName = RuleIdentifier.CATEGORY,
-                fieldPresentation = @AdminPresentation(fieldType = SupportedFieldType.RULE_SIMPLE, order = 6,
-                    tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-                    group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-                    ruleIdentifier = RuleIdentifier.CATEGORY, friendlyName = "Generic_Category_Rule")
-                    )
-        }
-    )
     @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
     @IgnoreEnterpriseBehavior
     Map<String, StructuredContentRule> structuredContentMatchRules = new HashMap<String, StructuredContentRule>();
@@ -207,11 +150,6 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     @OneToMany(fetch = FetchType.LAZY, targetEntity = StructuredContentItemCriteriaImpl.class, cascade={CascadeType.ALL})
     @JoinTable(name = "BLC_QUAL_CRIT_SC_XREF", joinColumns = @JoinColumn(name = "SC_ID"), inverseJoinColumns = @JoinColumn(name = "SC_ITEM_CRITERIA_ID"))
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
-    @AdminPresentation(friendlyName = "Generic_Item_Rule", order = 5,
-        tab = Presentation.Tab.Name.Rules, tabOrder = Presentation.Tab.Order.Rules,
-        group = Presentation.Group.Name.Rules, groupOrder = Presentation.Group.Order.Rules,
-        fieldType = SupportedFieldType.RULE_WITH_QUANTITY, 
-        ruleIdentifier = RuleIdentifier.ORDERITEM)
     @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
     @IgnoreEnterpriseBehavior
     protected Set<StructuredContentItemCriteria> qualifyingItemCriteria = new HashSet<StructuredContentItemCriteria>();
@@ -227,7 +165,6 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     @OneToMany(mappedBy = "structuredContent", targetEntity = StructuredContentFieldXrefImpl.class, cascade = CascadeType.ALL, orphanRemoval = true)
     @MapKey(name = "key")
     @BatchSize(size = 20)
-    @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
     @ClonePolicyMapOverride
     @ClonePolicyArchive
     protected Map<String, StructuredContentFieldXref> structuredContentFields = new HashMap<String, StructuredContentFieldXref>();
@@ -360,16 +297,6 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     @Override
     public void setPriority(Integer priority) {
         this.priority = priority;
-    }
-
-    @Override
-    public AdminAuditable getAuditable() {
-        return auditable;
-    }
-
-    @Override
-    public void setAuditable(AdminAuditable auditable) {
-        this.auditable = auditable;
     }
 
     @Override

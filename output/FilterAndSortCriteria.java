@@ -17,11 +17,13 @@
  * limitations under the License.
  * #L%
  */
+
 package org.broadleafcommerce.openadmin.dto;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.broadleafcommerce.common.util.BLCCollectionUtils;
 import org.broadleafcommerce.common.util.TypedPredicate;
+import org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.RestrictionType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,35 +37,71 @@ public class FilterAndSortCriteria {
     public static final String SORT_DIRECTION_PARAMETER = "sortDirection";
     public static final String START_INDEX_PARAMETER = "startIndex";
     public static final String MAX_INDEX_PARAMETER = "maxIndex";
-    
+
     public static final String IS_NULL_FILTER_VALUE = new String("BLC_SPECIAL_FILTER_VALUE:NULL").intern();
     public static final String IS_NOT_NULL_FILTER_VALUE = new String("BLC_SPECIAL_FILTER_VALUE:NOT_NULL").intern();
 
     protected String propertyId;
     protected List<String> filterValues = new ArrayList<String>();
+    protected RestrictionType restrictionType;
+    /**
+     * for "order", a null value is relevant, meaning that this field moves to the end of any sort order consideration
+     * (this is the opposite of what we would achieve, by having an uninitialized int variable set to 0)
+     */
+    protected Integer order;
 
     protected SortDirection sortDirection;
+
+    public FilterAndSortCriteria(String propertyId, int order) {
+        this.propertyId = propertyId;
+        this.order = order;
+    }
 
     public FilterAndSortCriteria(String propertyId) {
         this.propertyId = propertyId;
     }
-    
+
     public FilterAndSortCriteria(String propertyId, String filterValue) {
         this.propertyId = propertyId;
         setFilterValue(filterValue);
     }
-    
+
+    public FilterAndSortCriteria(String propertyId, String filterValue, int order) {
+        this.propertyId = propertyId;
+        this.order = order;
+        setFilterValue(filterValue);
+    }
+
+    public FilterAndSortCriteria(String propertyId, List<String> filterValues, int order) {
+        setPropertyId(propertyId);
+        this.order = order;
+        setFilterValues(filterValues);
+    }
+
     public FilterAndSortCriteria(String propertyId, List<String> filterValues) {
         setPropertyId(propertyId);
         setFilterValues(filterValues);
     }
-    
+
+    public FilterAndSortCriteria(String propertyId, List<String> filterValues, SortDirection sortDirection, int order) {
+        this.order = order;
+        setPropertyId(propertyId);
+        setFilterValues(filterValues);
+        setSortDirection(sortDirection);
+    }
+
     public FilterAndSortCriteria(String propertyId, List<String> filterValues, SortDirection sortDirection) {
         setPropertyId(propertyId);
         setFilterValues(filterValues);
         setSortDirection(sortDirection);
     }
-    
+
+    public FilterAndSortCriteria(String propertyId, String[] filterValues, int order) {
+        this.propertyId = propertyId;
+        this.order = order;
+        setFilterValues(Arrays.asList(filterValues));
+    }
+
     public FilterAndSortCriteria(String propertyId, String[] filterValues) {
         this.propertyId = propertyId;
         setFilterValues(Arrays.asList(filterValues));
@@ -124,9 +162,24 @@ public class FilterAndSortCriteria {
         // We want values that ARE special
         return CollectionUtils.exists(filterValues, getPredicateForSpecialValues(true));
     }
-    
+
+    public RestrictionType getRestrictionType() {
+        return restrictionType;
+    }
+
+    /**
+     * Useful when you want to explicitly define the type of pre-built {@link org.broadleafcommerce.openadmin.server.service.persistence.module.criteria.Restriction}
+     * instance to be used. The available, pre-built restrictions are defined in the Spring configured map "blRestrictionFactoryMap".
+     *
+     * @param restrictionType
+     */
+    public void setRestrictionType(RestrictionType restrictionType) {
+        this.restrictionType = restrictionType;
+    }
+
     protected TypedPredicate<String> getPredicateForSpecialValues(final boolean inclusive) {
         return new TypedPredicate<String>() {
+
             @Override
             public boolean eval(String value) {
                 // Note that this static String is the result of a call to String.intern(). This means that we are
@@ -139,6 +192,14 @@ public class FilterAndSortCriteria {
                 }
             }
         };
+    }
+
+    public Integer getOrder() {
+        return order;
+    }
+
+    public void setOrder(Integer order) {
+        this.order = order;
     }
 
 }
