@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.security.remote;
@@ -27,6 +25,7 @@ import org.broadleafcommerce.common.exception.SecurityServiceException;
 import org.broadleafcommerce.common.exception.ServiceException;
 import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
 import org.broadleafcommerce.common.security.service.ExploitProtectionService;
+import org.broadleafcommerce.common.util.StringUtil;
 import org.broadleafcommerce.common.web.SandBoxContext;
 import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.PersistencePackage;
@@ -159,6 +158,8 @@ public class AdminSecurityServiceRemote implements AdminSecurityService, Securit
             globalValidationResult = rowLevelSecurityService.validateUpdateRequest(getPersistentAdminUser(), entity, persistencePackage);
         } else if (operationType.equals(EntityOperationType.REMOVE)) {
             globalValidationResult = rowLevelSecurityService.validateRemoveRequest(getPersistentAdminUser(), entity, persistencePackage);
+        } else if (operationType.equals(EntityOperationType.ADD)) {
+            globalValidationResult = rowLevelSecurityService.validateAddRequest(getPersistentAdminUser(), entity, persistencePackage);
         }
         
         if (globalValidationResult != null) {
@@ -224,7 +225,7 @@ public class AdminSecurityServiceRemote implements AdminSecurityService, Securit
             //check if the requested entity is not configured and warn
             if (!securityService.doesOperationExistForCeilingEntity(permissionType, ceilingNames[0])) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Detected security request for an unregistered ceiling entity (" + ceilingNames[0] + "). " +
+                    LOG.warn("Detected security request for an unregistered ceiling entity (" + StringUtil.sanitize(ceilingNames[0]) + "). " +
                         "As a result, the request failed. Please make sure to configure security for any ceiling entities " +
                         "referenced via the admin. This is usually accomplished by adding records in the " +
                         "BLC_ADMIN_PERMISSION_ENTITY table. Note, depending on how the entity in question is used, you " +

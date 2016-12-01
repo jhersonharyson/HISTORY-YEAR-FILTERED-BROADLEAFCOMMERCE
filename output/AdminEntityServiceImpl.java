@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.service;
@@ -148,7 +146,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 String propertyName = info.getPropertyName();
                 String propertyValue;
                 if (entityForm.getFields().containsKey(propertyName)) {
-                    propertyValue = entityForm.getFields().get(propertyName).getValue();
+                    propertyValue = entityForm.findField(propertyName).getValue();
                 } else {
                     propertyValue = info.getPropertyValue();
                 }
@@ -175,7 +173,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 customCriteria = info.getCustomCriteriaOverride();
             } else {
                 String propertyName = info.getPropertyName();
-                String propertyValue = entityForm.getFields().get(propertyName).getValue();
+                String propertyValue = entityForm.findField(propertyName).getValue();
                 customCriteria = new String[] { info.getCriteriaName(), entityForm.getId(), propertyName, propertyValue };
             }
 
@@ -210,7 +208,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
 
     public PersistencePackageRequest getRequestForEntityForm(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumbs) {
         // Ensure the ID property is on the form
-        Field idField = entityForm.getFields().get(entityForm.getIdProperty());
+        Field idField = entityForm.findField(entityForm.getIdProperty());
         if (idField == null) {
             idField = new Field();
             idField.setName(entityForm.getIdProperty());
@@ -397,9 +395,11 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                     && p.getMetadata() instanceof CollectionMetadata) {
 
                 CollectionMetadata collectionMetadata = (CollectionMetadata) p.getMetadata();
-                TabMetadata tabMetadata = cmd.getTabMetadataUsingTabKey(collectionMetadata.getTab());
+
+                // Give preference to the Group since EntityForm.addListGrid() gives preference to the Group
+                TabMetadata tabMetadata = cmd.getTabMetadataUsingGroupKey(collectionMetadata.getGroup());
                 if (tabMetadata == null) {
-                    tabMetadata = cmd.getTabMetadataUsingGroupKey(collectionMetadata.getGroup());
+                    tabMetadata = cmd.getTabMetadataUsingTabKey(collectionMetadata.getTab());
                 }
 
                 String tabName = tabMetadata == null ? collectionMetadata.getTab() : tabMetadata.getTabName();
@@ -464,18 +464,13 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             Entity parentEntity, List<SectionCrumb> sectionCrumbs)
             throws ServiceException, ClassNotFoundException {
         // Assemble the properties from the entity form
-        List<Property> properties = new ArrayList<Property>();
-        for (Entry<String, Field> entry : entityForm.getFields().entrySet()) {
-            Property p = new Property();
-            p.setName(entry.getKey());
-            p.setValue(entry.getValue().getValue());
-            properties.add(p);
-        }
+        List<Property> properties = getPropertiesFromEntityForm(entityForm);
 
         FieldMetadata md = field.getMetadata();
 
         PersistencePackageRequest ppr = PersistencePackageRequest.fromMetadata(md, sectionCrumbs)
                 .withEntity(new Entity());
+        ppr.getEntity().setIsPreAdd(parentEntity.isPreAdd());
 
         if (md instanceof BasicCollectionMetadata) {
             BasicCollectionMetadata fmd = (BasicCollectionMetadata) md;
@@ -648,9 +643,8 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         Property p;
         String parentId = getContextSpecificRelationshipId(mainMetadata, parentEntity, field.getName());
 
-        Entity entity = new Entity();
         PersistencePackageRequest ppr = PersistencePackageRequest.fromMetadata(field.getMetadata(), sectionCrumbs)
-                .withEntity(entity);
+                .withEntity(new Entity());
 
         if (field.getMetadata() instanceof BasicCollectionMetadata) {
             BasicCollectionMetadata fmd = (BasicCollectionMetadata) field.getMetadata();
@@ -665,7 +659,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             p.setValue(parentId);
             properties.add(p);
 
-            entity.setType(new String[] { fmd.getCollectionCeilingEntity() });
+            ppr.getEntity().setType(new String[]{fmd.getCollectionCeilingEntity()});
         } else if (field.getMetadata() instanceof AdornedTargetCollectionMetadata) {
             AdornedTargetList adornedList = ppr.getAdornedList();
 
@@ -686,7 +680,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 properties.add(p);
             }
 
-            entity.setType(new String[] { adornedList.getAdornedTargetEntityClassname() });
+            ppr.getEntity().setType(new String[]{adornedList.getAdornedTargetEntityClassname()});
         } else if (field.getMetadata() instanceof MapMetadata) {
             MapMetadata fmd = (MapMetadata) field.getMetadata();
 
@@ -712,9 +706,10 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             p.setValue(itemId);
             properties.add(p);
 
-            entity.setType(new String[] { fmd.getTargetClass() });
+            ppr.getEntity().setType(new String[] { fmd.getTargetClass() });
         }
 
+        ppr.setCeilingEntityClassname(ppr.getEntity().getType()[0]);
         String sectionField = field.getName();
         if (sectionField.contains(".")) {
             sectionField = sectionField.substring(0, sectionField.lastIndexOf("."));
@@ -761,10 +756,14 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 
                 for (Property property : entity.getProperties()) {
                     if (property.getName().startsWith(tempPrefix)) {
-                        if (cmd.getPMap().containsKey(property.getName())) {
-                            BasicFieldMetadata md = (BasicFieldMetadata) cmd.getPMap().get(property.getName()).getMetadata();
-                            if (md.getFieldType().equals(SupportedFieldType.ID)) {
-                                return property.getValue();
+                        //make sure there is only one '.' to ensure we are looking at properties on the current prefix level
+                        //in the case of the prefix defaultSku, we want defaultSku.id not defaultSku.skuAttributes.id
+                        if (StringUtils.countMatches(property.getName().replace(tempPrefix, ""), ".") == 1) {
+                            if (cmd.getPMap().containsKey(property.getName())) {
+                                BasicFieldMetadata md = (BasicFieldMetadata) cmd.getPMap().get(property.getName()).getMetadata();
+                                if (md.getFieldType().equals(SupportedFieldType.ID)) {
+                                    return property.getValue();
+                                }
                             }
                         }
                     }
@@ -901,7 +900,11 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         if (request.getFilterAndSortCriteria() != null) {
             cto.addAll(Arrays.asList(request.getFilterAndSortCriteria()));
         }
-        
+
+        if (request.getMaxResults() != null) {
+            cto.setMaxResults(request.getMaxResults());
+        }
+
         if (request.getStartIndex() == null) {
             cto.setFirstResult(0);
         } else {
@@ -939,7 +942,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         
         return null;
     }
-    
+
     protected int getDefaultMaxResults() {
         return BLCSystemProperty.resolveIntSystemProperty("admin.default.max.results", 50);
     }

@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce CMS Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.cms.url.service;
@@ -44,6 +42,7 @@ import javax.annotation.Resource;
 public class URLHandlerServiceImpl implements URLHandlerService {
 
     private static final Log LOG = LogFactory.getLog(URLHandlerServiceImpl.class);
+    protected static final String REGEX_SPECIAL_CHARS_PATTERN = "([\\[\\]\\.\\|\\?\\*\\+\\(\\)\\\\~`\\!@#%&\\-_+={}'\"\"<>:;, \\/])"; //other than ^ and $
 
     @Resource(name="blURLHandlerDao")
     protected URLHandlerDao urlHandlerDao;
@@ -87,14 +86,7 @@ public class URLHandlerServiceImpl implements URLHandlerService {
             List<URLHandler> urlHandlers = findAllURLHandlers();
             for (URLHandler urlHandler : urlHandlers) {
                 currentHandler = urlHandler;
-                String incomingUrl = currentHandler.getIncomingURL();
-                if (!incomingUrl.startsWith("^")) {
-                    if (incomingUrl.startsWith("/")) {
-                        incomingUrl = "^" + incomingUrl + "$";
-                    } else {
-                        incomingUrl = "^/" + incomingUrl + "$";
-                    }
-                }
+                String incomingUrl = wrapStringsWithAnchors(currentHandler.getIncomingURL());
 
                 Pattern p = urlPatternMap.get(incomingUrl);
                 if (p == null) {
@@ -124,6 +116,22 @@ public class URLHandlerServiceImpl implements URLHandlerService {
 
 
         return null;
+    }
+
+    protected String wrapStringsWithAnchors(String incomingUrl) {
+        if (!incomingUrl.startsWith("^")) {
+            if (incomingUrl.substring(0,1).matches(REGEX_SPECIAL_CHARS_PATTERN)) {
+                incomingUrl = "^" + incomingUrl;
+            } else {
+                incomingUrl = "^/" + incomingUrl;
+            }
+        }
+
+        if (!incomingUrl.endsWith("$")) {
+            incomingUrl+= "$";
+        }
+
+        return incomingUrl;
     }
 
 }

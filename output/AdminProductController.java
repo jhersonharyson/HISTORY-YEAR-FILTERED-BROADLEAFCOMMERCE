@@ -2,23 +2,22 @@
  * #%L
  * BroadleafCommerce Admin Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.admin.web.controller.entity;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.broadleafcommerce.admin.server.service.handler.ProductCustomPersistenceHandler;
 import org.broadleafcommerce.common.exception.ServiceException;
@@ -30,6 +29,7 @@ import org.broadleafcommerce.core.catalog.domain.Sku;
 import org.broadleafcommerce.core.catalog.domain.SkuImpl;
 import org.broadleafcommerce.core.catalog.service.CatalogService;
 import org.broadleafcommerce.openadmin.dto.BasicCollectionMetadata;
+import org.broadleafcommerce.openadmin.dto.BasicFieldMetadata;
 import org.broadleafcommerce.openadmin.dto.ClassMetadata;
 import org.broadleafcommerce.openadmin.dto.ClassTree;
 import org.broadleafcommerce.openadmin.dto.DynamicResultSet;
@@ -39,12 +39,12 @@ import org.broadleafcommerce.openadmin.dto.Property;
 import org.broadleafcommerce.openadmin.dto.SectionCrumb;
 import org.broadleafcommerce.openadmin.server.domain.PersistencePackageRequest;
 import org.broadleafcommerce.openadmin.web.controller.entity.AdminBasicEntityController;
+import org.broadleafcommerce.openadmin.web.controller.modal.ModalHeaderType;
 import org.broadleafcommerce.openadmin.web.form.component.ListGrid;
 import org.broadleafcommerce.openadmin.web.form.component.ListGridAction;
 import org.broadleafcommerce.openadmin.web.form.entity.DefaultEntityFormActions;
 import org.broadleafcommerce.openadmin.web.form.entity.EntityForm;
 import org.broadleafcommerce.openadmin.web.form.entity.Field;
-import org.broadleafcommerce.openadmin.web.controller.modal.ModalHeaderType;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
@@ -52,8 +52,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -85,34 +88,6 @@ public class AdminProductController extends AdminBasicEntityController {
         }
         return SECTION_KEY;
     }
-    
-    @Override
-    public String[] getSectionCustomCriteria() {
-        return new String[]{"productDirectEdit"};
-    }
-
-    @Override
-    protected void modifyEntityForm(EntityForm ef, Map<String, String> pathVars) {
-        String defaultCategoryUrlPrefix = null;
-        Field defaultCategory = ef.findField("defaultCategory");
-        if (defaultCategory != null && StringUtils.isNotBlank(defaultCategory.getValue())) {
-            Category cat = catalogService.findCategoryById(Long.parseLong(defaultCategory.getValue()));
-            defaultCategoryUrlPrefix = cat.getUrl();
-        }
-
-        Field overrideGeneratedUrl = ef.findField("overrideGeneratedUrl");
-        overrideGeneratedUrl.setFieldType(SupportedFieldType.HIDDEN.toString().toLowerCase());
-        boolean overriddenUrl = Boolean.parseBoolean(overrideGeneratedUrl.getValue());
-        Field fullUrl = ef.findField("url");
-        if (fullUrl != null) {
-            fullUrl.withAttribute("overriddenUrl", overriddenUrl)
-                    .withAttribute("sourceField", "defaultSku--name")
-                    .withAttribute("toggleField", "overrideGeneratedUrl")
-                    .withAttribute("prefix-selector", "#field-defaultCategory")
-                    .withAttribute("prefix", defaultCategoryUrlPrefix)
-                    .withFieldType(SupportedFieldType.GENERATED_URL.toString().toLowerCase());
-        }
-    }
 
     @Override
     protected void modifyAddEntityForm(EntityForm ef, Map<String, String> pathVars) {
@@ -124,16 +99,18 @@ public class AdminProductController extends AdminBasicEntityController {
         }
                 
         Field overrideGeneratedUrl = ef.findField("overrideGeneratedUrl");
-        overrideGeneratedUrl.setFieldType(SupportedFieldType.HIDDEN.toString().toLowerCase());
-        boolean overriddenUrl = Boolean.parseBoolean(overrideGeneratedUrl.getValue());
-        Field fullUrl = ef.findField("url");
-        if (fullUrl != null) {
-            fullUrl.withAttribute("overriddenUrl", overriddenUrl)
-                .withAttribute("sourceField", "defaultSku--name")
-                .withAttribute("toggleField", "overrideGeneratedUrl")
-                .withAttribute("prefix-selector", "#field-defaultCategory")
-                .withAttribute("prefix", defaultCategoryUrlPrefix)
-                .withFieldType(SupportedFieldType.GENERATED_URL.toString().toLowerCase());
+        if (overrideGeneratedUrl != null) {
+            overrideGeneratedUrl.setFieldType(SupportedFieldType.HIDDEN.toString().toLowerCase());
+            boolean overriddenUrl = Boolean.parseBoolean(overrideGeneratedUrl.getValue());
+            Field fullUrl = ef.findField("url");
+            if (fullUrl != null) {
+                fullUrl.withAttribute("overriddenUrl", overriddenUrl)
+                        .withAttribute("sourceField", "defaultSku--name")
+                        .withAttribute("toggleField", "overrideGeneratedUrl")
+                        .withAttribute("prefix-selector", "#field-defaultCategory")
+                        .withAttribute("prefix", defaultCategoryUrlPrefix)
+                        .withFieldType(SupportedFieldType.GENERATED_URL.toString().toLowerCase());
+            }
         }
     }
     
@@ -265,6 +242,50 @@ public class AdminProductController extends AdminBasicEntityController {
     }
 
     @Override
+    @RequestMapping(value = "/selectize", method = RequestMethod.GET)
+    public @ResponseBody
+    Map<String, Object> viewEntityListSelectize(HttpServletRequest request,
+                                                HttpServletResponse response, Model model,
+                                                @PathVariable Map<String, String> pathVars,
+                                                @RequestParam MultiValueMap<String, String> requestParams) throws Exception {
+        String sectionKey = getSectionKey(pathVars);
+        String sectionClassName = getClassNameForSection(sectionKey);
+        List<SectionCrumb> crumbs = getSectionCrumbs(request, null, null);
+        PersistencePackageRequest ppr = getSectionPersistencePackageRequest(sectionClassName, requestParams, crumbs, pathVars)
+                .withFilterAndSortCriteria(getCriteria(requestParams))
+                .withStartIndex(getStartIndex(requestParams))
+                .withMaxIndex(getMaxIndex(requestParams))
+                .withCustomCriteria(getCustomCriteria(requestParams));
+
+        ClassMetadata cmd = service.getClassMetadata(ppr).getDynamicResultSet().getClassMetaData();
+        DynamicResultSet drs =  service.getRecords(ppr).getDynamicResultSet();
+
+        return constructSelectizeOptionMap(drs, cmd);
+    }
+
+    public Map<String, Object> constructSelectizeOptionMap(DynamicResultSet drs, ClassMetadata cmd) {
+        Map<String, Object> result = new HashMap<>();
+        List<Map<String, String>> options = new ArrayList<>();
+
+        for (Entity e : drs.getRecords()) {
+            Map<String, String> selectizeOption = new HashMap<>();
+
+            Property p = e.findProperty("MAIN_ENTITY_NAME");
+            if (p != null) {
+                selectizeOption.put("name", p.getValue());
+                selectizeOption.put("id", p.getValue());
+            }
+            if (e.findProperty(ALTERNATE_ID_PROPERTY) != null) {
+                selectizeOption.put("alternateId", e.findProperty(ALTERNATE_ID_PROPERTY).getValue());
+            }
+            options.add(selectizeOption);
+        }
+        result.put("options", options);
+
+        return result;
+    }
+
+    @Override
     @RequestMapping(value = "/{id}/{collectionField:.*}/{collectionItemId}", method = RequestMethod.GET)
     public String showUpdateCollectionItem(HttpServletRequest request, HttpServletResponse response, Model model,
             @PathVariable  Map<String, String> pathVars,
@@ -315,14 +336,19 @@ public class AdminProductController extends AdminBasicEntityController {
         //Skus have a specific toolbar action to generate Skus based on permutations
         EntityForm form = (EntityForm) model.asMap().get("entityForm");
         ListGridAction generateSkusAction = new ListGridAction(ListGridAction.GEN_SKUS).withDisplayText("Generate_Skus")
-                                                                .withIconClass("icon-fighter-jet")
-                                                                .withButtonClass("generate-skus")
-                                                                .withUrlPostfix("/generate-skus");
-        
+                .withIconClass("icon-fighter-jet")
+                .withButtonClass("generate-skus")
+                .withUrlPostfix("/generate-skus")
+                .withActionUrlOverride("/product/" + id + "/additionalSkus/generate-skus");
+
         ListGrid skusGrid = form.findListGrid("additionalSkus");
         if (skusGrid != null) {
-            skusGrid.addToolbarAction(generateSkusAction);
             skusGrid.setCanFilterAndSort(false);
+        }
+
+        ListGrid productOptionsGrid = form.findListGrid("productOptions");
+        if (productOptionsGrid != null) {
+            productOptionsGrid.addToolbarAction(generateSkusAction);
         }
         
         // When we're dealing with product bundles, we don't want to render the product options and additional skus
@@ -330,6 +356,7 @@ public class AdminProductController extends AdminBasicEntityController {
         if (ProductBundle.class.isAssignableFrom(Class.forName(form.getEntityType()))) {
             form.removeListGrid("additionalSkus");
             form.removeListGrid("productOptions");
+            form.removeField("canSellWithoutOptions");
         }
         
         form.removeListGrid("defaultSku.skuAttributes");

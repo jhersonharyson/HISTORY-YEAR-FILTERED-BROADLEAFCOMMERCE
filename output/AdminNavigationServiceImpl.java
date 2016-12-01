@@ -2,27 +2,31 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.security.service.navigation;
 
 import org.apache.commons.beanutils.BeanComparator;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.broadleafcommerce.common.extensibility.jpa.SiteDiscriminator;
+import org.broadleafcommerce.common.extension.ExtensionResultHolder;
+import org.broadleafcommerce.common.site.domain.Site;
+import org.broadleafcommerce.common.web.BroadleafRequestContext;
+import org.broadleafcommerce.openadmin.dto.SectionCrumb;
 import org.broadleafcommerce.openadmin.server.security.dao.AdminNavigationDao;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminMenu;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminModule;
@@ -33,13 +37,16 @@ import org.broadleafcommerce.openadmin.server.security.domain.AdminRole;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminSection;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.broadleafcommerce.openadmin.server.security.service.AdminSecurityService;
+import org.broadleafcommerce.openadmin.web.controller.AbstractAdminAbstractControllerExtensionHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.annotation.Resource;
 
@@ -53,11 +60,35 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
     private static final Log LOG = LogFactory.getLog(AdminNavigationServiceImpl.class);
     private static final String PATTERN = "_";
 
+    private static SectionComparator SECTION_COMPARATOR = new SectionComparator();
+
+    private static class SectionComparator implements Comparator<AdminSection> {
+
+        @Override
+        public int compare(AdminSection section, AdminSection section2) {
+            if (section.getDisplayOrder() != null) {
+                if (section2.getDisplayOrder() != null) {
+                    return section.getDisplayOrder().compareTo(section2.getDisplayOrder());
+                }
+                else
+                    return -1;
+            } else if (section2.getDisplayOrder() != null) {
+                return 1;
+            }
+
+            return section.getId().compareTo(section2.getId());
+        }
+
+    }
+
     @Resource(name = "blAdminNavigationDao")
     protected AdminNavigationDao adminNavigationDao;
 
     @Resource(name="blAdditionalSectionAuthorizations")
     protected List<SectionAuthorization> additionalSectionAuthorizations = new ArrayList<SectionAuthorization>();
+
+    @Resource(name = "blAdminNavigationServiceExtensionManager")
+    protected AdminNavigationServiceExtensionManager extensionManager;
 
     @Override
     @Transactional("blTransactionManager")
@@ -76,33 +107,6 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
         List<AdminModule> modules = adminNavigationDao.readAllAdminModules();
         populateAdminMenu(adminUser, adminMenu, modules);
         return adminMenu;
-    }
-
-    protected void populateAdminMenu(AdminUser adminUser, AdminMenu adminMenu, List<AdminModule> modules) {
-        for (AdminModule module : modules) {
-            List<AdminSection> authorizedSections = buildAuthorizedSectionsList(adminUser, module);
-            if (authorizedSections != null && authorizedSections.size() > 0) {
-                AdminModuleDTO adminModuleDto = ((AdminModuleImpl) module).getAdminModuleDTO();
-                adminMenu.getAdminModules().add(adminModuleDto);
-                adminModuleDto.setSections(authorizedSections);
-            }
-        }
-
-        // Sort the authorized modules
-        BeanComparator displayComparator = new BeanComparator("displayOrder");
-        Collections.sort(adminMenu.getAdminModules(), displayComparator);
-    }
-
-    protected List<AdminSection> buildAuthorizedSectionsList(AdminUser adminUser, AdminModule module) {
-        List<AdminSection> authorizedSections = new ArrayList<AdminSection>();
-        for (AdminSection section : module.getSections()) {
-            if (isUserAuthorizedToViewSection(adminUser, section)) {
-                authorizedSections.add(section);
-            }
-        }
-
-        Collections.sort(authorizedSections, SECTION_COMPARATOR);
-        return authorizedSections;
     }
 
     @Override
@@ -146,33 +150,38 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
 
     @Override
     public boolean isUserAuthorizedToViewSection(AdminUser adminUser, AdminSection section) {
-        boolean response = false;
         List<AdminPermission> authorizedPermissions = section.getPermissions();
-        checkAuth: {
-            if (!CollectionUtils.isEmpty(adminUser.getAllRoles())) {
-                for (AdminRole role : adminUser.getAllRoles()) {
-                    for (AdminPermission permission : role.getAllPermissions()){
-                        if (checkPermissions(authorizedPermissions, permission)) {
-                            response = true;
-                            break checkAuth;
-                        }
-                    }
-                }
+
+        Set<String> authorizedPermissionNames = null;
+        if (authorizedPermissions != null) {
+            authorizedPermissionNames = new HashSet<>((authorizedPermissions.size() * 2));
+            for (AdminPermission authorizedPermission : authorizedPermissions) {
+                authorizedPermissionNames.add(authorizedPermission.getName());
+                authorizedPermissionNames.add(parseForAllPermission(authorizedPermission.getName()));
             }
-            if (!CollectionUtils.isEmpty(adminUser.getAllPermissions())) {
-                for (AdminPermission permission : adminUser.getAllPermissions()){
-                    if (checkPermissions(authorizedPermissions, permission)) {
+        }
+
+        boolean response = false;
+        if (!CollectionUtils.isEmpty(adminUser.getAllRoles())) {
+            for (AdminRole role : adminUser.getAllRoles()) {
+                for (AdminPermission permission : role.getAllPermissions()){
+                    if (checkPermissions(authorizedPermissionNames, permission.getName())) {
                         response = true;
-                        break checkAuth;
                     }
                 }
             }
+        }
+        if (!response && !CollectionUtils.isEmpty(adminUser.getAllPermissions())) {
+            for (AdminPermission permission : adminUser.getAllPermissions()){
+                if (checkPermissions(authorizedPermissionNames, permission.getName())) {
+                    response = true;
+                }
+            }
+        }
+        if (!response) {
             for (String defaultPermission : AdminSecurityService.DEFAULT_PERMISSIONS) {
-                for (AdminPermission authorizedPermission : authorizedPermissions) {
-                    if (authorizedPermission.getName().equals(defaultPermission)) {
-                        response = true;
-                        break checkAuth;
-                    }
+                if (checkPermissions(authorizedPermissionNames, defaultPermission)) {
+                    response = true;
                 }
             }
         }
@@ -196,19 +205,53 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
         return sections;
     }
 
-    protected boolean checkPermissions(List<AdminPermission> authorizedPermissions, AdminPermission permission) {
-        if (authorizedPermissions != null) {
-            if (authorizedPermissions.contains(permission)){
+    @Override
+    public boolean checkPermissions(Set<String> authorizedPermissionNames, String permissionName) {
+        if (authorizedPermissionNames != null) {
+            if (authorizedPermissionNames.contains(permissionName)){
                 return true;
-            }
-
-            for (AdminPermission authorizedPermission : authorizedPermissions) {
-                if (permission.getName().equals(parseForAllPermission(authorizedPermission.getName()))) {
-                    return true;
-                }
             }
         }
         return false;
+    }
+
+    public List<SectionAuthorization> getAdditionalSectionAuthorizations() {
+            return additionalSectionAuthorizations;
+        }
+
+    public void setAdditionalSectionAuthorizations(List<SectionAuthorization> additionalSectionAuthorizations) {
+        this.additionalSectionAuthorizations = additionalSectionAuthorizations;
+    }
+
+    @Override
+    public String getClassNameForSection(String sectionKey) {
+        AdminSection section = findAdminSectionByURI("/" + sectionKey);
+
+        ExtensionResultHolder erh = new ExtensionResultHolder();
+        extensionManager.getProxy().overrideClassNameForSection(erh, sectionKey, section);
+        if (erh.getContextMap().get(AbstractAdminAbstractControllerExtensionHandler.NEW_CLASS_NAME) != null) {
+            return (String) erh.getContextMap().get(AbstractAdminAbstractControllerExtensionHandler.NEW_CLASS_NAME);
+        }
+
+        return (section == null) ? sectionKey : section.getCeilingEntity();
+    }
+
+    @Override
+    public List<SectionCrumb> getSectionCrumbs(String crumbList) {
+        List<SectionCrumb> myCrumbs = new ArrayList<SectionCrumb>();
+        if (!StringUtils.isEmpty(crumbList)) {
+            String[] crumbParts = crumbList.split(",");
+            for (String part : crumbParts) {
+                SectionCrumb crumb = new SectionCrumb();
+                String[] crumbPieces = part.split("--");
+                crumb.setSectionIdentifier(crumbPieces[0]);
+                crumb.setSectionId(crumbPieces[1]);
+                if (!myCrumbs.contains(crumb)) {
+                    myCrumbs.add(crumb);
+                }
+            }
+        }
+        return myCrumbs;
     }
 
     protected String parseForAllPermission(String currentPermission) {
@@ -225,32 +268,40 @@ public class AdminNavigationServiceImpl implements AdminNavigationService {
         return builder.toString();
     }
 
-    private static SectionComparator SECTION_COMPARATOR = new SectionComparator();
-
-    private static class SectionComparator implements Comparator<AdminSection> {
-
-        @Override
-        public int compare(AdminSection section, AdminSection section2) {
-            if (section.getDisplayOrder() != null) {
-                if (section2.getDisplayOrder() != null) {
-                    return section.getDisplayOrder().compareTo(section2.getDisplayOrder());
-                }
-                else
-                    return -1;
-            } else if (section2.getDisplayOrder() != null) {
-                return 1;
+    protected void populateAdminMenu(AdminUser adminUser, AdminMenu adminMenu, List<AdminModule> modules) {
+        for (AdminModule module : modules) {
+            List<AdminSection> authorizedSections = buildAuthorizedSectionsList(adminUser, module);
+            if (authorizedSections != null && authorizedSections.size() > 0) {
+                AdminModuleDTO adminModuleDto = ((AdminModuleImpl) module).getAdminModuleDTO();
+                adminMenu.getAdminModules().add(adminModuleDto);
+                adminModuleDto.setSections(authorizedSections);
             }
-
-            return section.getId().compareTo(section2.getId());
         }
 
+        // Sort the authorized modules
+        BeanComparator displayComparator = new BeanComparator("displayOrder");
+        Collections.sort(adminMenu.getAdminModules(), displayComparator);
     }
 
-    public List<SectionAuthorization> getAdditionalSectionAuthorizations() {
-        return additionalSectionAuthorizations;
-    }
+    protected List<AdminSection> buildAuthorizedSectionsList(AdminUser adminUser, AdminModule module) {
+        List<AdminSection> authorizedSections = new ArrayList<AdminSection>();
+        BroadleafRequestContext broadleafRequestContext = BroadleafRequestContext.getBroadleafRequestContext();
+        Site site = broadleafRequestContext.getNonPersistentSite();
+        Long siteId = site == null ? null : site.getId();
+        for (AdminSection section : module.getSections()) {
+            if (isUserAuthorizedToViewSection(adminUser, section)) {
+                if(section instanceof SiteDiscriminator){
+                    Long sectionSiteId = ((SiteDiscriminator)section).getSiteDiscriminator();
+                    if(sectionSiteId == null || sectionSiteId.equals(siteId)){
+                        authorizedSections.add(section);
+                    }
+                } else{
+                    authorizedSections.add(section);
+                }
+            }
+        }
 
-    public void setAdditionalSectionAuthorizations(List<SectionAuthorization> additionalSectionAuthorizations) {
-        this.additionalSectionAuthorizations = additionalSectionAuthorizations;
+        Collections.sort(authorizedSections, SECTION_COMPARATOR);
+        return authorizedSections;
     }
 }

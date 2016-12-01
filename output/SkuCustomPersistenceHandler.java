@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Admin Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 
@@ -23,6 +21,7 @@ package org.broadleafcommerce.admin.server.service.handler;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Transformer;
 import org.apache.commons.lang.BooleanUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -31,11 +30,14 @@ import org.broadleafcommerce.common.presentation.client.OperationType;
 import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
+import org.broadleafcommerce.common.sandbox.SandBoxHelper;
 import org.broadleafcommerce.common.util.BLCCollectionUtils;
 import org.broadleafcommerce.common.util.EfficientLRUMap;
 import org.broadleafcommerce.common.util.TypedTransformer;
 import org.broadleafcommerce.common.util.dao.DynamicDaoHelperImpl;
 import org.broadleafcommerce.core.catalog.domain.Product;
+import org.broadleafcommerce.core.catalog.domain.ProductBundle;
+import org.broadleafcommerce.core.catalog.domain.ProductImpl;
 import org.broadleafcommerce.core.catalog.domain.ProductOption;
 import org.broadleafcommerce.core.catalog.domain.ProductOptionValue;
 import org.broadleafcommerce.core.catalog.domain.ProductOptionValueImpl;
@@ -55,6 +57,7 @@ import org.broadleafcommerce.openadmin.dto.MergedPropertyType;
 import org.broadleafcommerce.openadmin.dto.PersistencePackage;
 import org.broadleafcommerce.openadmin.dto.PersistencePerspective;
 import org.broadleafcommerce.openadmin.dto.Property;
+import org.broadleafcommerce.openadmin.dto.SectionCrumb;
 import org.broadleafcommerce.openadmin.server.dao.DynamicEntityDao;
 import org.broadleafcommerce.openadmin.server.service.handler.CustomPersistenceHandlerAdapter;
 import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceManager;
@@ -74,6 +77,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -100,7 +104,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
 
     @Value("${solr.index.use.sku}")
     protected boolean useSku;
-    
+
     @Value("${cache.entity.dao.metadata.ttl}")
     protected int cacheEntityMetaDataTtl;
 
@@ -125,7 +129,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
 
     @Resource(name="blCatalogService")
     protected CatalogService catalogService;
-    
+
     @PersistenceContext(unitName = "blPU")
     protected EntityManager em;
 
@@ -306,7 +310,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
         metadata.setMutable(false);
         metadata.setInheritedFromType(inheritedFromType.getName());
         
-        metadata.setAvailableToTypes(getPolymorphicClasses(SkuImpl.class));
+        metadata.setAvailableToTypes(getPolymorphicClasses(SkuImpl.class, em, useCache()));
         metadata.setForeignKeyCollection(false);
         metadata.setMergedPropertyType(MergedPropertyType.PRIMARY);
 
@@ -322,19 +326,6 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
         metadata.setGridOrder(Integer.MAX_VALUE);
 
         return metadata;
-    }
-
-    protected String[] getPolymorphicClasses(Class<?> clazz) {
-        DynamicDaoHelperImpl helper = new DynamicDaoHelperImpl();
-        Class<?>[] classes = helper.getAllPolymorphicEntitiesFromCeiling(clazz,
-                helper.getSessionFactory((HibernateEntityManager) em), 
-                true,
-                useCache());
-        String[] result = new String[classes.length];
-        for (int i = 0; i < classes.length; i++) {
-            result[i] = classes[i].getName();
-        }
-        return result;
     }
     
     /**
@@ -401,7 +392,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
             metadata.setFieldType(SupportedFieldType.EXPLICIT_ENUMERATION);
             metadata.setMutable(true);
             metadata.setInheritedFromType(SkuImpl.class.getName());
-            metadata.setAvailableToTypes(getPolymorphicClasses(SkuImpl.class));
+            metadata.setAvailableToTypes(getPolymorphicClasses(SkuImpl.class, em, useCache()));
             metadata.setForeignKeyCollection(false);
             metadata.setMergedPropertyType(MergedPropertyType.PRIMARY);
     
@@ -445,6 +436,7 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
             
             //allow subclasses to provide additional criteria before executing the query
             applyProductOptionValueCriteria(filterMappings, cto, persistencePackage, null);
+            applySkuBundleItemValueCriteria(filterMappings, cto, persistencePackage);
             applyAdditionalFetchCriteria(filterMappings, cto, persistencePackage);
 
             List<Serializable> records = helper.getPersistentRecords(persistencePackage.getCeilingEntityFullyQualifiedClassname(), filterMappings, cto.getFirstResult(), cto.getMaxResults());
@@ -483,6 +475,61 @@ public class SkuCustomPersistenceHandler extends CustomPersistenceHandlerAdapter
         } catch (Exception e) {
             throw new ServiceException("Unable to perform fetch for entity: " + ceilingEntityFullyQualifiedClassname, e);
         }
+    }
+
+    /**
+     * Add filter restriction such that a ProductBundle cannot add its own default sku as a Sku Bundle Item
+     */
+    private void applySkuBundleItemValueCriteria(List<FilterMapping> filterMappings, CriteriaTransferObject cto, PersistencePackage persistencePackage) {
+        SectionCrumb[] sectionCrumbs = persistencePackage.getSectionCrumbs();
+        if (isSkuBundleItemLookup(persistencePackage, sectionCrumbs)) {
+            final Long defaultSkuId = getOwningProductBundlesDefaultSkuId(sectionCrumbs[0]);
+
+            filterMappings.add(new FilterMapping()
+                    .withDirectFilterValues(Collections.singletonList(defaultSkuId))
+                    .withRestriction(new Restriction()
+                                    .withPredicateProvider(new PredicateProvider() {
+                                        @Override
+                                        public Predicate buildPredicate(CriteriaBuilder builder,
+                                                FieldPathBuilder fieldPathBuilder,
+                                                From root, String ceilingEntity,
+                                                String fullPropertyName, Path explicitPath,
+                                                List directValues) {
+                                            return builder.notEqual(root, directValues.get(0));
+                                        }
+                                    })
+                    ));
+        }
+    }
+
+    private boolean isSkuBundleItemLookup(PersistencePackage pkg, SectionCrumb[] sectionCrumbs) {
+        boolean owningClassMatch = false;
+        boolean requestingFieldMatch = false;
+
+        if (pkg.getCustomCriteria() == null || ArrayUtils.isEmpty(sectionCrumbs)) {
+            return false;
+        }
+
+        for (String criteria : pkg.getCustomCriteria()) {
+            if ("owningClass=org.broadleafcommerce.core.catalog.domain.SkuBundleItemImpl".equals(criteria)) {
+                owningClassMatch = true;
+            } else if ("requestingField=sku".equals(criteria)) {
+                requestingFieldMatch = true;
+            }
+        }
+
+        boolean sectionCrumbMatch = ProductImpl.class.getCanonicalName().equals(sectionCrumbs[0].getSectionIdentifier());
+
+        return owningClassMatch && requestingFieldMatch && sectionCrumbMatch;
+    }
+
+    private Long getOwningProductBundlesDefaultSkuId(SectionCrumb sectionCrumb) {
+        if (ProductImpl.class.getCanonicalName().equals(sectionCrumb.getSectionIdentifier())
+                && sectionCrumb.getSectionId() != null) {
+            ProductBundle productBundle = (ProductBundle) catalogService.findProductById(Long.valueOf(sectionCrumb.getSectionId()));
+            return productBundle.getDefaultSku().getId();
+        }
+        return null;
     }
 
     public void applyProductOptionValueCriteria(List<FilterMapping> filterMappings, CriteriaTransferObject cto, PersistencePackage persistencePackage, String skuPropertyPrefix) {

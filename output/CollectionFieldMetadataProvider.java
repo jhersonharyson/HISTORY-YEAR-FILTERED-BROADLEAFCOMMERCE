@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.dao.provider.metadata;
@@ -25,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.presentation.AdminPresentationCollection;
 import org.broadleafcommerce.common.presentation.AdminPresentationOperationTypes;
+import org.broadleafcommerce.common.presentation.FieldValueConfiguration;
 import org.broadleafcommerce.common.presentation.client.AddMethodType;
 import org.broadleafcommerce.common.presentation.client.ForeignKeyRestrictionType;
 import org.broadleafcommerce.common.presentation.client.OperationType;
@@ -53,7 +52,9 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -284,6 +285,8 @@ public class CollectionFieldMetadataProvider extends AdvancedCollectionFieldMeta
                 fieldMetadataOverride.setFriendlyName(stringValue);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.ADDFRIENDLYNAME)) {
                 fieldMetadataOverride.setAddFriendlyName(stringValue);
+            } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.GROUP)) {
+                fieldMetadataOverride.setGroup(stringValue);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.MANYTOFIELD)) {
                 fieldMetadataOverride.setManyToField(stringValue);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.OPERATIONTYPES)) {
@@ -306,6 +309,8 @@ public class CollectionFieldMetadataProvider extends AdvancedCollectionFieldMeta
                 fieldMetadataOverride.setSecurityLevel(stringValue);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.SHOWIFPROPERTY)) {
                 fieldMetadataOverride.setShowIfProperty(stringValue);
+            } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.SHOWIFFIELDEQUALS)) {
+                processShowIfFieldEqualsAnnotations(entry.getValue().showIfFieldEquals(), fieldMetadataOverride);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationCollection.SORTASCENDING)) {
                 fieldMetadataOverride.setSortAscending(StringUtils.isEmpty(stringValue) ? entry.getValue()
                             .booleanOverrideValue() :
@@ -357,6 +362,9 @@ public class CollectionFieldMetadataProvider extends AdvancedCollectionFieldMeta
             override.setUpdateType(annotColl.operationTypes().updateType());
             override.setInspectType(annotColl.operationTypes().inspectType());
             override.setShowIfProperty(annotColl.showIfProperty());
+            if (annotColl.showIfFieldEquals().length != 0) {
+                processShowIfFieldEqualsAnnotations(annotColl.showIfFieldEquals(), override);
+            }
             override.setCurrencyCodeField(annotColl.currencyCodeField());
             override.setLazyFetch(annotColl.lazyFetch());
             return override;
@@ -390,7 +398,9 @@ public class CollectionFieldMetadataProvider extends AdvancedCollectionFieldMeta
         if (collectionMetadata.getShowIfProperty()!=null) {
             metadata.setShowIfProperty(collectionMetadata.getShowIfProperty());
         }
-
+        if (collectionMetadata.getShowIfFieldEquals() != null) {
+            metadata.setShowIfFieldEquals(collectionMetadata.getShowIfFieldEquals());
+        }
         org.broadleafcommerce.openadmin.dto.OperationTypes dtoOperationTypes = new org.broadleafcommerce.openadmin.dto.OperationTypes(OperationType.BASIC, OperationType.BASIC, OperationType.BASIC, OperationType.BASIC, OperationType.BASIC);
         if (collectionMetadata.getAddType() != null) {
             dtoOperationTypes.setAddType(collectionMetadata.getAddType());
@@ -562,6 +572,15 @@ public class CollectionFieldMetadataProvider extends AdvancedCollectionFieldMeta
         }
 
         attributes.put(field.getName(), metadata);
+    }
+
+    protected void processShowIfFieldEqualsAnnotations(FieldValueConfiguration[] configurations, FieldMetadataOverride override) {
+        if (override.getShowIfFieldEquals() == null) {
+            override.setShowIfFieldEquals(new HashMap<String, List<String>>());
+        }
+        for (FieldValueConfiguration configuration : configurations) {
+            override.getShowIfFieldEquals().put(configuration.fieldName(), Arrays.asList(configuration.fieldValues()));
+        }
     }
 
     @Override

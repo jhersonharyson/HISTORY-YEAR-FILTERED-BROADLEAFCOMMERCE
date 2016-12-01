@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.dao.provider.metadata;
@@ -25,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.presentation.AdminPresentationMap;
 import org.broadleafcommerce.common.presentation.AdminPresentationOperationTypes;
+import org.broadleafcommerce.common.presentation.FieldValueConfiguration;
 import org.broadleafcommerce.common.presentation.client.OperationType;
 import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
 import org.broadleafcommerce.common.presentation.client.UnspecifiedBooleanType;
@@ -54,7 +53,9 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -340,6 +341,8 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
                 fieldMetadataOverride.setSecurityLevel(stringValue);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationMap.SHOWIFPROPERTY)) {
                 fieldMetadataOverride.setShowIfProperty(stringValue);
+            } else if (entry.getKey().equals(PropertyType.AdminPresentationMap.SHOWIFFIELDEQUALS)) {
+                processShowIfFieldEqualsAnnotations(entry.getValue().showIfFieldEquals(), fieldMetadataOverride);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationMap.TAB)) {
                 fieldMetadataOverride.setTab(stringValue);
             } else if (entry.getKey().equals(PropertyType.AdminPresentationMap.TABORDER)) {
@@ -401,6 +404,9 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
             override.setUpdateType(map.operationTypes().updateType());
             override.setInspectType(map.operationTypes().inspectType());
             override.setShowIfProperty(map.showIfProperty());
+            if (map.showIfFieldEquals().length != 0) {
+                processShowIfFieldEqualsAnnotations(map.showIfFieldEquals(), override);
+            }
             override.setCurrencyCodeField(map.currencyCodeField());
             override.setForceFreeFormKeys(map.forceFreeFormKeys());
             override.setManyToField(map.manyToField());
@@ -426,6 +432,9 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
         }
         if (map.getShowIfProperty()!=null) {
             metadata.setShowIfProperty(map.getShowIfProperty());
+        }
+        if (map.getShowIfFieldEquals() != null) {
+            metadata.setShowIfFieldEquals(map.getShowIfFieldEquals());
         }
         metadata.setPrefix(prefix);
 
@@ -717,6 +726,15 @@ public class MapFieldMetadataProvider extends AdvancedCollectionFieldMetadataPro
         }
 
         attributes.put(field.getName(), metadata);
+    }
+
+    protected void processShowIfFieldEqualsAnnotations(FieldValueConfiguration[] configurations, FieldMetadataOverride override) {
+        if (override.getShowIfFieldEquals() == null) {
+            override.setShowIfFieldEquals(new HashMap<String, List<String>>());
+        }
+        for (FieldValueConfiguration configuration : configurations) {
+            override.getShowIfFieldEquals().put(configuration.fieldName(), Arrays.asList(configuration.fieldValues()));
+        }
     }
 
     @Override

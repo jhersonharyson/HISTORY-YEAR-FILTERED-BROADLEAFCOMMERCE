@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce CMS Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.cms.file.service;
@@ -30,6 +28,7 @@ import org.broadleafcommerce.cms.file.domain.StaticAsset;
 import org.broadleafcommerce.cms.file.domain.StaticAssetImpl;
 import org.broadleafcommerce.common.extension.ExtensionResultStatusType;
 import org.broadleafcommerce.common.file.service.StaticAssetPathService;
+import org.broadleafcommerce.common.util.StringUtil;
 import org.broadleafcommerce.common.util.TransactionUtils;
 import org.broadleafcommerce.openadmin.server.service.artifact.image.ImageArtifactProcessor;
 import org.broadleafcommerce.openadmin.server.service.artifact.image.ImageMetadata;
@@ -37,11 +36,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import eu.medsea.mimeutil.MimeType;
-import eu.medsea.mimeutil.MimeUtil;
-import eu.medsea.mimeutil.detector.ExtensionMimeDetector;
-import eu.medsea.mimeutil.detector.MagicMimeMimeDetector;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,6 +48,11 @@ import java.util.Map;
 import java.util.Random;
 
 import javax.annotation.Resource;
+
+import eu.medsea.mimeutil.MimeType;
+import eu.medsea.mimeutil.MimeUtil;
+import eu.medsea.mimeutil.detector.ExtensionMimeDetector;
+import eu.medsea.mimeutil.detector.MagicMimeMimeDetector;
 
 /**
  * Created by bpolster.
@@ -81,6 +80,8 @@ public class StaticAssetServiceImpl implements StaticAssetService {
     @Resource(name = "blStaticAssetMultiTenantExtensionManager")
     protected StaticAssetMultiTenantExtensionManager staticAssetExtensionManager;
 
+    @Value("${should.accept.non.image.asset:true}")
+    protected boolean shouldAcceptNonImageAsset;
 
     private final Random random = new Random();
     private final String FILE_NAME_CHARS = "0123456789abcdef";
@@ -105,7 +106,7 @@ public class StaticAssetServiceImpl implements StaticAssetService {
         if (pos > 0) {
             return fileName.substring(pos + 1, fileName.length()).toLowerCase();
         } else {
-            LOG.warn("No extension provided for asset : " + fileName);
+            LOG.warn("No extension provided for asset : " + StringUtil.sanitize(fileName));
             return null;
         }
     }
@@ -145,21 +146,17 @@ public class StaticAssetServiceImpl implements StaticAssetService {
         
         if (entityType != null && !"null".equals(entityType)) {
             path = path.append(entityType).append("/");
-        } else {
-            LOG.warn("The given entityType to build the asset URL was null for file " + originalFilename + " and entityId " + entityId + ", investigate probably cause");
         }
 
         if (entityId != null && !"null".equals(entityId)) {
             path = path.append(entityId).append("/");
-        } else {
-            LOG.warn("The given entityId to build the asset URL was null for file " + originalFilename + " and entityType " + entityType + ", investigate probably cause");
         }
 
         if (fileName != null) {
             int pos = fileName.indexOf(":");
             if (pos > 0) {
                 if (LOG.isTraceEnabled()) {
-                    LOG.trace("Removing protocol from URL name" + fileName);
+                    LOG.trace("Removing protocol from URL name" + StringUtil.sanitize(fileName));
                 }
                 fileName = fileName.substring(pos + 1);
             }
@@ -210,8 +207,7 @@ public class StaticAssetServiceImpl implements StaticAssetService {
                 fullUrl = getCountUrl(fullUrl, count, false);
             }
         }
-
-
+        
         try {
             ImageMetadata metadata = imageArtifactProcessor.getImageMetadata(inputStream);
             newAsset = new ImageStaticAssetImpl();
@@ -219,7 +215,15 @@ public class StaticAssetServiceImpl implements StaticAssetService {
             ((ImageStaticAsset) newAsset).setHeight(metadata.getHeight());
         } catch (Exception e) {
             //must not be an image stream
-            newAsset = new StaticAssetImpl();
+            LOG.warn("unable to convert asset:" + fileName + " into Image");
+            LOG.debug(e);
+            
+            if (getShouldAcceptNonImageAsset()) {
+                newAsset =  createNonImageAsset(inputStream, fileName, properties);
+            }
+            else {
+                throw new RuntimeException("Selected Asset/File was not valid image.");
+            }
         }
         if (storeAssetsOnFileSystem) {
             newAsset.setStorageType(StorageType.FILESYSTEM);
@@ -235,7 +239,19 @@ public class StaticAssetServiceImpl implements StaticAssetService {
 
         return staticAssetDao.addOrUpdateStaticAsset(newAsset, false);
     }
-    
+
+    /**
+     * Hook-point for implementors to add custom business logic for handling files that are non-images
+     *
+     * @param inputStream
+     * @param fileName
+     * @param properties
+     * @return
+     */
+    protected StaticAsset createNonImageAsset(InputStream inputStream, String fileName, Map<String, String> properties) {
+        return new StaticAssetImpl();
+    }
+
     /**
      * Gets the count URL based on the original fullUrl. If requested in legacy format this will return URLs like:
      * 
@@ -325,4 +341,11 @@ public class StaticAssetServiceImpl implements StaticAssetService {
         return staticAssetPathService.convertAssetPath(assetPath, contextPath, secureRequest);
     }
 
+    public boolean getShouldAcceptNonImageAsset() {
+        return shouldAcceptNonImageAsset;
+    }
+
+    public void setShouldAcceptNonImageAsset(boolean accept) {
+        shouldAcceptNonImageAsset = accept;
+    }
 }

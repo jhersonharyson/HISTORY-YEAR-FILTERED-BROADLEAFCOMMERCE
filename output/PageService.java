@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce CMS Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.cms.page.service;
@@ -72,7 +70,6 @@ public interface PageService {
      * fix the URL if the site has overridden the URL for images.   If secure is true
      * and images are being overridden, the system will use https.
      *
-     * @param currentSandbox - current sandbox
      * @param locale - current locale
      * @param uri - the URI to return a page for
      * @param ruleDTOs - ruleDTOs that are used as the data to process page rules
@@ -97,23 +94,24 @@ public interface PageService {
      * Call to evict all known PageDTOs that are associated with the given page from cache
      * 
      * @param key
+     * @return whether successful
      */
-    public void removePageFromCache(String key);
+    public Boolean removePageFromCache(String key);
 
     Cache getPageCache();
 
     Cache getPageMapCache();
 
     /**
-     * Builds a list of {@link PageDTO} objects from the given list of {@link Page} objects.
+     * Builds a list of {@link PageDTO} objects from the given list of {@link Page} objects and caches the list
      * 
      * @param pageList
      * @param secure
-     * @return
+     * @param identifier
+     * @param locale
+     * @return copy of DTOList
      */
-    public List<PageDTO> buildPageDTOList(List<Page> pageList, boolean secure);
+    public List<PageDTO> buildPageDTOList(List<Page> pageList, boolean secure, String identifier, Locale locale);
 
-    String getPageMapCacheKey(String uri, Long sandBox, Long site);
-
-
+    String getPageMapCacheKey(String uri, Long sandBoxId, Long site);
 }

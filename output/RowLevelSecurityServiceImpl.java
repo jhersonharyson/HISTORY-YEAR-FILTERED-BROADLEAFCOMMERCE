@@ -2,25 +2,25 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2014 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.security.service;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.broadleafcommerce.openadmin.dto.ClassMetadata;
 import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.PersistencePackage;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
@@ -40,12 +40,12 @@ import javax.persistence.criteria.Root;
 
 
 /**
- * 
- * 
+ * @see org.broadleafcommerce.openadmin.server.security.service.RowLevelSecurityService
  * @author Phillip Verheyden (phillipuniverse)
+ * @author Jeff Fischer
  */
 @Service("blRowLevelSecurityService")
-public class RowLevelSecurityServiceImpl implements RowLevelSecurityService {
+public class RowLevelSecurityServiceImpl implements RowLevelSecurityService, ExceptionAwareRowLevelSecurityProvider {
     
     private static final Log LOG = LogFactory.getLog(RowLevelSecurityServiceImpl.class);
     
@@ -86,9 +86,38 @@ public class RowLevelSecurityServiceImpl implements RowLevelSecurityService {
     }
 
     @Override
+    public EntityFormModifierConfiguration getUpdateDenialExceptions() {
+        EntityFormModifierConfiguration sum = new EntityFormModifierConfiguration();
+        for (RowLevelSecurityProvider provider : getProviders()) {
+            if (provider instanceof ExceptionAwareRowLevelSecurityProvider) {
+                EntityFormModifierConfiguration response = ((ExceptionAwareRowLevelSecurityProvider) provider).getUpdateDenialExceptions();
+                if (response != null) {
+                    if (!CollectionUtils.isEmpty(response.getModifier())) {
+                        sum.getModifier().addAll(response.getModifier());
+                    }
+                    if (!CollectionUtils.isEmpty(response.getData())) {
+                        sum.getData().addAll(response.getData());
+                    }
+                }
+            }
+        }
+        return sum;
+    }
+
+    @Override
     public boolean canRemove(AdminUser currentUser, Entity entity) {
         for (RowLevelSecurityProvider provider : getProviders()) {
             if (!provider.canRemove(currentUser, entity)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean canAdd(AdminUser currentUser, String sectionClassName, ClassMetadata cmd) {
+        for (RowLevelSecurityProvider provider : getProviders()) {
+            if (!provider.canAdd(currentUser, sectionClassName, cmd)) {
                 return false;
             }
         }
@@ -120,7 +149,21 @@ public class RowLevelSecurityServiceImpl implements RowLevelSecurityService {
         }
         return validationResult;
     }
-    
+
+    @Override
+    public GlobalValidationResult validateAddRequest(AdminUser currentUser, Entity entity, PersistencePackage persistencePackage) {
+        GlobalValidationResult validationResult = new GlobalValidationResult(true);
+        for (RowLevelSecurityProvider provider : getProviders()) {
+            GlobalValidationResult providerValidation = provider.validateAddRequest(currentUser, entity,
+                    persistencePackage);
+            if (providerValidation.isNotValid()) {
+                validationResult.setValid(false);
+                validationResult.addErrorMessage(providerValidation.getErrorMessage());
+            }
+        }
+        return validationResult;
+    }
+
     @Override
     public List<RowLevelSecurityProvider> getProviders() {
         return providers;

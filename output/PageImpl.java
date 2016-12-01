@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce CMS Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.cms.page.domain;
@@ -93,7 +91,8 @@ import javax.persistence.Table;
 )
 @DirectCopyTransform({
         @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.SANDBOX, skipOverlaps=true),
-        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE)
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.MULTITENANT_SITE),
+        @DirectCopyTransformMember(templateTokens = DirectCopyTransformTypes.AUDITABLE_ONLY)
 })
 @Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region = "blCMSElements")
 public class PageImpl implements Page, AdminMainEntity, Locatable, ProfileEntity, PageAdminPresentation {
@@ -151,7 +150,7 @@ public class PageImpl implements Page, AdminMainEntity, Locatable, ProfileEntity
 
     @Column(name = "OFFLINE_FLAG")
     @AdminPresentation(friendlyName = "PageImpl_Offline", order = 3500,
-        group = PageAdminPresentation.GroupName.Misc, groupOrder = PageAdminPresentation.GroupOrder.Misc, defaultValue = "false")
+        group = GroupName.Misc, defaultValue = "false")
     protected Boolean offlineFlag = false;
 
     /*
@@ -178,8 +177,8 @@ public class PageImpl implements Page, AdminMainEntity, Locatable, ProfileEntity
 
     @Column(name = "EXCLUDE_FROM_SITE_MAP")
     @AdminPresentation(friendlyName = "PageImpl_Exclude_From_Site_Map", order = 1800,
-        group = PageAdminPresentation.GroupName.Basic, groupOrder = PageAdminPresentation.GroupOrder.Basic)
-    protected Boolean excludeFromSiteMap;
+        tab = TabName.Seo, group = GroupName.Sitemap, defaultValue = "false")
+    protected Boolean excludeFromSiteMap = false;
 
     @OneToMany(mappedBy = "page", targetEntity = PageAttributeImpl.class, cascade = { CascadeType.ALL }, orphanRemoval = true)
     @MapKey(name = "name")
@@ -203,12 +202,12 @@ public class PageImpl implements Page, AdminMainEntity, Locatable, ProfileEntity
 
     @Column (name = "META_TITLE")
     @AdminPresentation(friendlyName = "PageImpl_metaTitle", order = 2000,
-        group = PageAdminPresentation.GroupName.Misc, groupOrder = PageAdminPresentation.GroupOrder.Misc, largeEntry = true)
+        tab = TabName.Seo, group = GroupName.Tags, largeEntry = true)
     protected String metaTitle;
 
     @Column (name = "META_DESCRIPTION")
     @AdminPresentation(friendlyName = "PageImpl_metaDescription", order = 3000,
-        group = PageAdminPresentation.GroupName.Misc, groupOrder = PageAdminPresentation.GroupOrder.Misc, largeEntry = true)
+        tab = TabName.Seo, group = GroupName.Tags, largeEntry = true)
     protected String metaDescription;
 
     @Override

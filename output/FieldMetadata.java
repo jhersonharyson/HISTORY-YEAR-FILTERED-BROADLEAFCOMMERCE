@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.dto;
@@ -24,6 +22,7 @@ import org.broadleafcommerce.openadmin.dto.visitor.MetadataVisitor;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -59,6 +58,7 @@ public abstract class FieldMetadata implements Serializable {
     private String prefix;
     private String fieldName;
     private String showIfProperty;
+    private Map<String, List<String>> showIfFieldEquals;
     private String currencyCodeField;
 
     //Additional metadata not supported as first class
@@ -119,6 +119,7 @@ public abstract class FieldMetadata implements Serializable {
         metadata.childrenExcluded = childrenExcluded;
         metadata.fieldName = fieldName;
         metadata.showIfProperty = showIfProperty;
+        metadata.showIfFieldEquals = showIfFieldEquals;
         metadata.currencyCodeField = currencyCodeField;
         metadata.lazyFetch = lazyFetch;
         for (Map.Entry<String, Object> entry : additionalMetadata.entrySet()) {
@@ -133,6 +134,14 @@ public abstract class FieldMetadata implements Serializable {
 
     public void setShowIfProperty(String showIfProperty) {
         this.showIfProperty = showIfProperty;
+    }
+
+    public Map<String, List<String>> getShowIfFieldEquals() {
+        return showIfFieldEquals;
+    }
+
+    public void setShowIfFieldEquals(Map<String, List<String>> showIfFieldEquals) {
+        this.showIfFieldEquals = showIfFieldEquals;
     }
 
     public String getCurrencyCodeField() {
@@ -304,6 +313,8 @@ public abstract class FieldMetadata implements Serializable {
             return false;
         if (showIfProperty != null ? !showIfProperty.equals(that.showIfProperty) : that.showIfProperty != null)
             return false;
+        if (showIfFieldEquals != null ? !showIfFieldEquals.equals(that.showIfFieldEquals) : that.showIfFieldEquals != null)
+            return false;
         if (tab != null ? !tab.equals(that.tab) : that.tab != null) return false;
         if (tabOrder != null ? !tabOrder.equals(that.tabOrder) : that.tabOrder != null) return false;
         if (group != null ? !group.equals(that.group) : that.group != null) return false;
@@ -332,6 +343,7 @@ public abstract class FieldMetadata implements Serializable {
         result = 31 * result + (prefix != null ? prefix.hashCode() : 0);
         result = 31 * result + (fieldName != null ? fieldName.hashCode() : 0);
         result = 31 * result + (showIfProperty != null ? showIfProperty.hashCode() : 0);
+        result = 31 * result + (showIfFieldEquals != null ? showIfFieldEquals.hashCode() : 0);
         result = 31 * result + (currencyCodeField != null ? currencyCodeField.hashCode() : 0);
         result = 31 * result + (additionalMetadata != null ? additionalMetadata.hashCode() : 0);
         return result;

@@ -2,23 +2,22 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.dto;
 
+import org.apache.commons.lang3.StringUtils;
 import org.broadleafcommerce.common.presentation.client.LookupType;
 import org.broadleafcommerce.common.presentation.client.RuleBuilderDisplayType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
@@ -67,9 +66,10 @@ public class BasicFieldMetadata extends FieldMetadata {
     protected Integer gridOrder;
     protected String columnWidth;
     protected String broadleafEnumeration;
+    protected Boolean hideEnumerationIfEmpty;
     protected SupportedFieldType fieldComponentRenderer;
     protected Boolean readOnly;
-    protected Map<String, List<Map<String, String>>> validationConfigurations = new HashMap<String, List<Map<String, String>>>(5);
+    protected Map<String, List<Map<String, String>>> validationConfigurations = new HashMap<>(5);
     protected Boolean requiredOverride;
     protected String tooltip;
     protected String helpText;
@@ -81,6 +81,7 @@ public class BasicFieldMetadata extends FieldMetadata {
     protected String optionValueFieldName;
     protected String optionDisplayFieldName;
     protected Boolean optionCanEditValues;
+    protected Boolean optionHideIfEmpty;
     protected String[][] optionFilterParams;
     protected String[] customCriteria;
     protected Boolean useServerSideInspectionCache;
@@ -89,6 +90,7 @@ public class BasicFieldMetadata extends FieldMetadata {
     protected LookupType lookupType;
     protected Boolean translatable;
     protected String defaultValue;
+    protected Boolean isFilter;
 
     //for MapFields
     protected String mapFieldValueClass;
@@ -285,6 +287,14 @@ public class BasicFieldMetadata extends FieldMetadata {
         this.broadleafEnumeration = broadleafEnumeration;
     }
 
+    public Boolean getHideEnumerationIfEmpty() {
+        return hideEnumerationIfEmpty;
+    }
+
+    public void setHideEnumerationIfEmpty(Boolean hideEnumerationIfEmpty) {
+        this.hideEnumerationIfEmpty = hideEnumerationIfEmpty;
+    }
+
     public SupportedFieldType getFieldComponentRenderer() {
         return fieldComponentRenderer;
     }
@@ -401,6 +411,14 @@ public class BasicFieldMetadata extends FieldMetadata {
 
     public void setOptionCanEditValues(Boolean optionCanEditValues) {
         this.optionCanEditValues = optionCanEditValues;
+    }
+
+    public Boolean getOptionHideIfEmpty() {
+        return optionHideIfEmpty;
+    }
+
+    public void setOptionHideIfEmpty(Boolean optionHideIfEmpty) {
+        this.optionHideIfEmpty = optionHideIfEmpty;
     }
 
     public String getOptionDisplayFieldName() {
@@ -539,6 +557,19 @@ public class BasicFieldMetadata extends FieldMetadata {
         this.defaultValue = defaultValue;
     }
 
+    public Boolean getIsFilter() {
+        return isFilter;
+    }
+
+    public void setIsFilter(Boolean isFilter) {
+        this.isFilter = isFilter;
+    }
+
+    public Boolean getAllowNoValueEnumOption() {
+        return StringUtils.isEmpty(getDefaultValue())
+            || (!getRequired() && !(getRequiredOverride() != null && getRequiredOverride()));
+    }
+
     @Override
     public FieldMetadata cloneFieldMetadata() {
         BasicFieldMetadata metadata = new BasicFieldMetadata();
@@ -574,6 +605,7 @@ public class BasicFieldMetadata extends FieldMetadata {
         metadata.gridOrder = gridOrder;        
         metadata.columnWidth = columnWidth;
         metadata.broadleafEnumeration = broadleafEnumeration;
+        metadata.hideEnumerationIfEmpty = hideEnumerationIfEmpty;
         metadata.fieldComponentRenderer = fieldComponentRenderer;
         metadata.readOnly = readOnly;
         metadata.requiredOverride = requiredOverride;
@@ -581,10 +613,10 @@ public class BasicFieldMetadata extends FieldMetadata {
         metadata.helpText = helpText;
         metadata.hint = hint;
         for (Map.Entry<String, List<Map<String, String>>> entry : validationConfigurations.entrySet()) {
-            List<Map<String, String>> clonedConfigItems = new ArrayList<Map<String, String>>(entry.getValue().size());
+            List<Map<String, String>> clonedConfigItems = new ArrayList<>(entry.getValue().size());
             
             for (Map<String, String> configEntries : entry.getValue()) {
-                Map<String, String> clone = new HashMap<String, String>(configEntries.keySet().size());
+                Map<String, String> clone = new HashMap<>(configEntries.keySet().size());
                 for (Map.Entry<String, String> entry2 : configEntries.entrySet()) {
                     clone.put(entry2.getKey(), entry2.getValue());
                 }
@@ -597,6 +629,7 @@ public class BasicFieldMetadata extends FieldMetadata {
         metadata.enableTypeaheadLookup = enableTypeaheadLookup;
         metadata.optionListEntity = optionListEntity;
         metadata.optionCanEditValues = optionCanEditValues;
+        metadata.optionHideIfEmpty = optionHideIfEmpty;
         metadata.optionDisplayFieldName = optionDisplayFieldName;
         metadata.optionValueFieldName = optionValueFieldName;
         if (optionFilterParams != null) {
@@ -649,6 +682,9 @@ public class BasicFieldMetadata extends FieldMetadata {
         BasicFieldMetadata metadata = (BasicFieldMetadata) o;
 
         if (broadleafEnumeration != null ? !broadleafEnumeration.equals(metadata.broadleafEnumeration) : metadata.broadleafEnumeration != null) {
+            return false;
+        }
+        if (hideEnumerationIfEmpty != null ? !hideEnumerationIfEmpty.equals(metadata.hideEnumerationIfEmpty) : metadata.hideEnumerationIfEmpty != null) {
             return false;
         }
         if (fieldComponentRenderer != null ? !fieldComponentRenderer.equals(metadata.fieldComponentRenderer) : metadata.fieldComponentRenderer != null) {
@@ -715,6 +751,9 @@ public class BasicFieldMetadata extends FieldMetadata {
             return false;
         }
         if (optionCanEditValues != null ? !optionCanEditValues.equals(metadata.optionCanEditValues) : metadata.optionCanEditValues != null) {
+            return false;
+        }
+        if (optionHideIfEmpty != null ? !optionHideIfEmpty.equals(metadata.optionHideIfEmpty) : metadata.optionHideIfEmpty != null) {
             return false;
         }
         if (optionDisplayFieldName != null ? !optionDisplayFieldName.equals(metadata.optionDisplayFieldName) : metadata.optionDisplayFieldName != null) {
@@ -820,6 +859,7 @@ public class BasicFieldMetadata extends FieldMetadata {
         result = 31 * result + (gridOrder != null ? gridOrder.hashCode() : 0);
         result = 31 * result + (columnWidth != null ? columnWidth.hashCode() : 0);
         result = 31 * result + (broadleafEnumeration != null ? broadleafEnumeration.hashCode() : 0);
+        result = 31 * result + (hideEnumerationIfEmpty != null ? hideEnumerationIfEmpty.hashCode() : 0);
         result = 31 * result + (fieldComponentRenderer != null ? fieldComponentRenderer.hashCode() : 0);
         result = 31 * result + (readOnly != null ? readOnly.hashCode() : 0);
         result = 31 * result + (validationConfigurations != null ? validationConfigurations.hashCode() : 0);
@@ -834,6 +874,7 @@ public class BasicFieldMetadata extends FieldMetadata {
         result = 31 * result + (optionValueFieldName != null ? optionValueFieldName.hashCode() : 0);
         result = 31 * result + (optionDisplayFieldName != null ? optionDisplayFieldName.hashCode() : 0);
         result = 31 * result + (optionCanEditValues != null ? optionCanEditValues.hashCode() : 0);
+        result = 31 * result + (optionHideIfEmpty != null ? optionHideIfEmpty.hashCode() : 0);
         result = 31 * result + (ruleIdentifier != null ? ruleIdentifier.hashCode() : 0);
         result = 31 * result + (mapFieldValueClass != null ? mapFieldValueClass.hashCode() : 0);
         result = 31 * result + (searchable != null ? searchable.hashCode() : 0);

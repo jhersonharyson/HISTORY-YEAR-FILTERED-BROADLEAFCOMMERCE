@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce CMS Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.cms.admin.web.controller;
@@ -89,7 +87,12 @@ public class AdminPageController extends AdminBasicEntityController {
         EntityForm ef = (EntityForm) model.asMap().get("entityForm");
         
         DynamicEntityFormInfo info = getDynamicForm(ef, id);
-        EntityForm dynamicForm = getDynamicFieldTemplateForm(info, id, null);
+        EntityForm dynamicForm;
+        if (info.getPropertyValue() != null) {
+            dynamicForm = getDynamicFieldTemplateForm(info, id, null);
+        } else {
+            dynamicForm = getEntityForm(info, null);
+        }
         ef.putDynamicFormInfo("pageTemplate", info);
         ef.putDynamicForm("pageTemplate", dynamicForm);
 
@@ -120,7 +123,7 @@ public class AdminPageController extends AdminBasicEntityController {
         if (result.hasErrors()) {
             info = entityForm.getDynamicFormInfo("pageTemplate");
             if (entityForm.getFields().containsKey("pageTemplate")) {
-                info.setPropertyValue(entityForm.getFields().get("pageTemplate").getValue());
+                info.setPropertyValue(entityForm.findField("pageTemplate").getValue());
             }
             
             //grab back the dynamic form that was actually put in
@@ -139,8 +142,12 @@ public class AdminPageController extends AdminBasicEntityController {
                     inputDynamicForm.getFields().put(f.getName(), f);
                 }
             }
-            
-            EntityForm dynamicForm = getDynamicFieldTemplateForm(info, id, inputDynamicForm);
+            EntityForm dynamicForm;
+            if (info.getPropertyValue() != null) {
+                dynamicForm = getDynamicFieldTemplateForm(info, id, inputDynamicForm);
+            } else {
+                dynamicForm = getEntityForm(info, inputDynamicForm);
+            }
             entityForm.putDynamicForm("pageTemplate", dynamicForm);
 
             entityForm.removeListGrid("additionalAttributes");

@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce Admin Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.admin.server.service.handler;
@@ -22,6 +20,7 @@ package org.broadleafcommerce.admin.server.service.handler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.exception.ServiceException;
+import org.broadleafcommerce.common.persistence.Status;
 import org.broadleafcommerce.common.presentation.client.OperationType;
 import org.broadleafcommerce.openadmin.dto.Entity;
 import org.broadleafcommerce.openadmin.dto.FieldMetadata;
@@ -32,11 +31,14 @@ import org.broadleafcommerce.openadmin.server.service.handler.CustomPersistenceH
 import org.broadleafcommerce.openadmin.server.service.persistence.module.RecordHelper;
 import org.broadleafcommerce.profile.core.dao.RoleDao;
 import org.broadleafcommerce.profile.core.domain.Customer;
+import org.broadleafcommerce.profile.core.domain.CustomerAddress;
 import org.broadleafcommerce.profile.core.service.CustomerService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import javax.annotation.Resource;
 
@@ -59,17 +61,17 @@ public class CustomerCustomPersistenceHandler extends CustomPersistenceHandlerAd
 
     @Override
     public Boolean canHandleAdd(PersistencePackage persistencePackage) {
-        return persistencePackage.getCeilingEntityFullyQualifiedClassname() != null && persistencePackage.getCeilingEntityFullyQualifiedClassname().equals(Customer.class.getName());
+        return Objects.equals(persistencePackage.getCeilingEntityFullyQualifiedClassname(), Customer.class.getCanonicalName());
     }
 
     @Override
     public Boolean canHandleUpdate(PersistencePackage persistencePackage) {
-        return persistencePackage.getCeilingEntityFullyQualifiedClassname() != null && persistencePackage.getCeilingEntityFullyQualifiedClassname().equals(Customer.class.getName());
+        return Objects.equals(persistencePackage.getCeilingEntityFullyQualifiedClassname(), Customer.class.getCanonicalName());
     }
 
     @Override
     public Boolean canHandleRemove(PersistencePackage persistencePackage) {
-        return persistencePackage.getCeilingEntityFullyQualifiedClassname() != null && persistencePackage.getCeilingEntityFullyQualifiedClassname().equals(Customer.class.getName());
+        return Objects.equals(persistencePackage.getCeilingEntityFullyQualifiedClassname(), Customer.class.getCanonicalName());
     }
     
     @Override
@@ -152,7 +154,27 @@ public class CustomerCustomPersistenceHandler extends CustomPersistenceHandlerAd
     public void remove(PersistencePackage persistencePackage, DynamicEntityDao dynamicEntityDao, RecordHelper helper) throws ServiceException {
     	Entity entity = persistencePackage.getEntity();
     	try {
-			roleDao.removeCustomerRolesByCustomerId(Long.parseLong(entity.findProperty("id").getValue()));
+    	    
+            Long customerId = Long.parseLong(entity.findProperty("id").getValue());
+            
+            Customer customer = customerService.readCustomerById(customerId);
+            if (Status.class.isAssignableFrom(customer.getClass())) {
+                ((Status) customer).setArchived('Y');
+                
+                // If the customer has a conditional weave on ArchiveStatus, nothing triggers the delete so other
+                // normally-cascaded deletes don't happen (like CustomerAddress)
+                List<CustomerAddress> addressList = customer.getCustomerAddresses();
+                for (CustomerAddress address : addressList) {
+                    address.setArchived('Y');
+                }
+                
+                customer = customerService.saveCustomer(customer);
+                return;
+            }
+            
+            // Remove the customer roles for the customer since it's not cascaded
+            roleDao.removeCustomerRolesByCustomerId(customerId);
+            
 			helper.getCompatibleModule(OperationType.BASIC).remove(persistencePackage);
 		} catch (Exception e) {
 			LOG.error("Unable to execute persistence activity", e);

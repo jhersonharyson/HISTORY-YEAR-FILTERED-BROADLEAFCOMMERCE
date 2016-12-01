@@ -2,25 +2,22 @@
  * #%L
  * BroadleafCommerce Open Admin Platform
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.openadmin.server.security.service;
 
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
@@ -32,6 +29,7 @@ import org.broadleafcommerce.common.security.util.PasswordUtils;
 import org.broadleafcommerce.common.service.GenericResponse;
 import org.broadleafcommerce.common.time.SystemTime;
 import org.broadleafcommerce.common.util.BLCSystemProperty;
+import org.broadleafcommerce.common.util.StringUtil;
 import org.broadleafcommerce.openadmin.server.security.dao.AdminPermissionDao;
 import org.broadleafcommerce.openadmin.server.security.dao.AdminRoleDao;
 import org.broadleafcommerce.openadmin.server.security.dao.AdminUserDao;
@@ -72,7 +70,8 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
 
     private static final Log LOG = LogFactory.getLog(AdminSecurityServiceImpl.class);
 
-    private static int PASSWORD_TOKEN_LENGTH = 12;
+    private static int TEMP_PASSWORD_LENGTH = 12;
+    private static final int FULL_PASSWORD_LENGTH = 16;
 
     @Resource(name = "blAdminRoleDao")
     protected AdminRoleDao adminRoleDao;
@@ -231,13 +230,11 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
             returnUser.setPassword(encodePassword(unencodedPassword, getSalt(returnUser, unencodedPassword)));
         }
 
-
-
         return adminUserDao.saveAdminUser(returnUser);
     }
 
     protected String generateSecurePassword() {
-        return RandomStringUtils.randomAlphanumeric(16);
+        return PasswordUtils.generateSecurePassword(FULL_PASSWORD_LENGTH);
     }
 
     @Override
@@ -335,7 +332,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
         checkUser(user,response);
         
         if (! response.getHasErrors()) {        
-            String token = PasswordUtils.generateTemporaryPassword(PASSWORD_TOKEN_LENGTH);
+            String token = PasswordUtils.generateSecurePassword(TEMP_PASSWORD_LENGTH);
             token = token.toLowerCase();
 
             ForgotPasswordSecurityToken fpst = new ForgotPasswordSecurityTokenImpl();
@@ -397,7 +394,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
         if (! response.getHasErrors()) {
             if (! user.getId().equals(fpst.getAdminUserId())) {
                 if (LOG.isWarnEnabled()) {
-                    LOG.warn("Password reset attempt tried with mismatched user and token " + user.getId() + ", " + token);
+                    LOG.warn("Password reset attempt tried with mismatched user and token " + user.getId() + ", " + StringUtil.sanitize(token));
                 }
                 response.addErrorCode("invalidToken");
             }
@@ -453,11 +450,11 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     }
 
     public static int getPASSWORD_TOKEN_LENGTH() {
-        return PASSWORD_TOKEN_LENGTH;
+        return TEMP_PASSWORD_LENGTH;
     }
 
     public static void setPASSWORD_TOKEN_LENGTH(int PASSWORD_TOKEN_LENGTH) {
-        AdminSecurityServiceImpl.PASSWORD_TOKEN_LENGTH = PASSWORD_TOKEN_LENGTH;
+        AdminSecurityServiceImpl.TEMP_PASSWORD_LENGTH = PASSWORD_TOKEN_LENGTH;
     }
 
     public EmailInfo getSendUsernameEmailInfo() {

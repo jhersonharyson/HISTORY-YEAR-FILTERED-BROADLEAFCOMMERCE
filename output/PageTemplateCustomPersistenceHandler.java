@@ -2,19 +2,17 @@
  * #%L
  * BroadleafCommerce CMS Module
  * %%
- * Copyright (C) 2009 - 2013 Broadleaf Commerce
+ * Copyright (C) 2009 - 2016 Broadleaf Commerce
  * %%
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Broadleaf Fair Use License Agreement, Version 1.0
+ * (the "Fair Use License" located  at http://license.broadleafcommerce.org/fair_use_license-1.0.txt)
+ * unless the restrictions on use therein are violated and require payment to Broadleaf in which case
+ * the Broadleaf End User License Agreement (EULA), Version 1.1
+ * (the "Commercial License" located at http://license.broadleafcommerce.org/commercial_license-1.1.txt)
+ * shall apply.
  * 
- *       http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Alternatively, the Commercial License may be replaced with a mutually agreed upon license (the "Custom License")
+ * between you and Broadleaf Commerce. You may not use this file except in compliance with the applicable license.
  * #L%
  */
 package org.broadleafcommerce.cms.admin.server.handler;
@@ -144,6 +142,10 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
         String pageId = pp.getCustomCriteria()[1];
         String pageTemplateId = pp.getCustomCriteria().length > 3 ? pp.getCustomCriteria()[3] : null;
 
+        if (pageId == null) {
+            return new ArrayList<FieldGroup>(0);
+        }
+
         Page page = pageService.findPageById(Long.valueOf(pageId));
         PageTemplate template = null;
         if (pageTemplateId != null) {
@@ -180,30 +182,39 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
             String pageId = persistencePackage.getCustomCriteria()[1];
             Entity entity = fetchEntityBasedOnId(pageId, null);
             DynamicResultSet results = new DynamicResultSet(new Entity[]{entity}, 1);
-
-            // Some of the values in this entity might be foreign key lookups. In this case, we need to set the display
-            // value appropriately
-            for (Property prop : entity.getProperties()) {
-                if (StringUtils.isNotBlank(prop.getValue()) && StringUtils.isNotBlank(prop.getMetadata().getOwningClass())) {
-                    Class<?> clazz = Class.forName(prop.getMetadata().getOwningClass());
-                    Class<?>[] lookupClasses = dynamicEntityDao.getAllPolymorphicEntitiesFromCeiling(clazz);
-
-                    int i = 0;
-                    Object foreignEntity = null;
-                    while (foreignEntity == null && i < lookupClasses.length) {
-                        foreignEntity = dynamicEntityDao.find(lookupClasses[i++], Long.parseLong(prop.getValue()));
-                    }
-
-                    if (foreignEntity instanceof AdminMainEntity) {
-                        prop.setDisplayValue(((AdminMainEntity) foreignEntity).getMainEntityName());
-                    }
-                    prop.getMetadata().setOwningClass(null);
-                }
-            }
+            populateFKLookupValues(dynamicEntityDao, entity);
 
             return results;
         } catch (Exception e) {
             throw new ServiceException("Unable to perform fetch for entity: "+ceilingEntityFullyQualifiedClassname, e);
+        }
+    }
+
+    /**
+     * Some of the values in this entity might be foreign key lookups. In this case, we need to set the display
+     * value appropriately
+     *
+     * @param dynamicEntityDao
+     * @param entity
+     * @throws ClassNotFoundException
+     */
+    protected void populateFKLookupValues(DynamicEntityDao dynamicEntityDao, Entity entity) throws ClassNotFoundException {
+        for (Property prop : entity.getProperties()) {
+            if (StringUtils.isNotBlank(prop.getValue()) && StringUtils.isNotBlank(prop.getMetadata().getOwningClass())) {
+                Class<?> clazz = Class.forName(prop.getMetadata().getOwningClass());
+                Class<?>[] lookupClasses = dynamicEntityDao.getAllPolymorphicEntitiesFromCeiling(clazz);
+
+                int i = 0;
+                Object foreignEntity = null;
+                while (foreignEntity == null && i < lookupClasses.length) {
+                    foreignEntity = dynamicEntityDao.find(lookupClasses[i++], Long.parseLong(prop.getValue()));
+                }
+
+                if (foreignEntity instanceof AdminMainEntity) {
+                    prop.setDisplayValue(((AdminMainEntity) foreignEntity).getMainEntityName());
+                }
+                prop.getMetadata().setOwningClass(null);
+            }
         }
     }
 
@@ -227,7 +238,17 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
         Entity entity = new Entity();
         entity.setType(new String[]{PageTemplateImpl.class.getName()});
         List<Property> propertiesList = new ArrayList<Property>();
-        for (FieldGroup fieldGroup : getFieldGroups(page, null)) {
+        List<FieldGroup> fieldGroups = getFieldGroups(page, null);
+        processFieldGroups(dirtyFields, pageFieldMap, propertiesList, fieldGroups);
+        processIncludeId(includeId, page, propertiesList);
+
+        entity.setProperties(propertiesList.toArray(new Property[]{}));
+
+        return entity;
+    }
+
+    protected void processFieldGroups(List<String> dirtyFields, Map<String, PageField> pageFieldMap, List<Property> propertiesList, List<FieldGroup> fieldGroups) {
+        for (FieldGroup fieldGroup : fieldGroups) {
             for (FieldDefinition def : fieldGroup.getFieldDefinitions()) {
                 Property property = new Property();
                 propertiesList.add(property);
@@ -250,16 +271,15 @@ public class PageTemplateCustomPersistenceHandler extends CustomPersistenceHandl
                 }
             }
         }
+    }
+
+    protected void processIncludeId(boolean includeId, Page page, List<Property> propertiesList) {
         if (includeId) {
             Property property = new Property();
             propertiesList.add(property);
             property.setName("id");
             property.setValue(String.valueOf(page.getId()));
         }
-
-        entity.setProperties(propertiesList.toArray(new Property[]{}));
-
-        return entity;
     }
 
     @Override
