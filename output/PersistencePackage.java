@@ -53,6 +53,8 @@ public class PersistencePackage implements Serializable, StateDescriptor {
 
     protected boolean isTreeCollection = false;
 
+    protected boolean isAddOperationInspect = false;
+
     public PersistencePackage(String ceilingEntityFullyQualifiedClassname, Entity entity, PersistencePerspective persistencePerspective, String[] customCriteria, String csrfToken) {
         this(ceilingEntityFullyQualifiedClassname, null, entity, persistencePerspective, customCriteria, csrfToken);
     }
@@ -128,26 +130,18 @@ public class PersistencePackage implements Serializable, StateDescriptor {
     }
 
     public void removeCustomCriteria(String criteria) {
-        int pos = containsCriteria(criteria);
+        int pos = getCriteriaIndex(criteria);
         if (pos >= 0) {
             customCriteria = ArrayUtils.remove(customCriteria, pos);
         }
     }
 
-    public int containsCriteria(String criteria) {
-        if (ArrayUtils.isEmpty(customCriteria)) {
-            return -1;
-        }
-        
-        for (int i = 0; i < customCriteria.length; i++) {
-            if (customCriteria[i] != null && customCriteria[i].equals(criteria)) {
-                return i;
-            } else if (customCriteria[i] == null && criteria == null) {
-                return i;
-            }
-        }
+    public int getCriteriaIndex(String criteria) {
+        return ArrayUtils.indexOf(customCriteria, criteria);
+    }
 
-        return -1;
+    public boolean containsCriteria(String criteria) {
+        return ArrayUtils.contains(customCriteria, criteria);
     }
     
     public Entity getEntity() {
@@ -300,6 +294,14 @@ public class PersistencePackage implements Serializable, StateDescriptor {
 
     public void setIsTreeCollection(boolean isTreeCollection) {
         this.isTreeCollection = isTreeCollection;
+    }
+
+    public boolean isAddOperationInspect() {
+        return isAddOperationInspect;
+    }
+
+    public void setAddOperationInspect(boolean addOperationInspect) {
+        isAddOperationInspect = addOperationInspect;
     }
 
     @Override

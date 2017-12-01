@@ -96,6 +96,11 @@ public class StaticAssetServiceImpl implements StaticAssetService {
         return staticAssetDao.readAllStaticAssets();
     }
 
+    @Override
+    public Long findTotalStaticAssetCount() {
+        return staticAssetDao.readTotalStaticAssetCount();
+    }
+
     static {
         MimeUtil.registerMimeDetector(ExtensionMimeDetector.class.getName());
         MimeUtil.registerMimeDetector(MagicMimeMimeDetector.class.getName());
@@ -324,6 +329,18 @@ public class StaticAssetServiceImpl implements StaticAssetService {
     @Override
     public String getStaticAssetUrlPrefix() {
         return staticAssetPathService.getStaticAssetUrlPrefix();
+    }
+
+    @Override
+    public String getPrefixedStaticAssetUrl(String assetUrl) {
+        String staticAssetUrlPrefix = getStaticAssetUrlPrefix();
+        if (staticAssetUrlPrefix != null && !staticAssetUrlPrefix.startsWith("/")) {
+            staticAssetUrlPrefix = "/" + staticAssetUrlPrefix;
+        }
+        if (staticAssetUrlPrefix != null) {
+            return staticAssetUrlPrefix + assetUrl;
+        }
+        return assetUrl;
     }
 
     @Override

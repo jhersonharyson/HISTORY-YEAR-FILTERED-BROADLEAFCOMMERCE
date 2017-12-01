@@ -38,6 +38,8 @@ public interface StaticAssetService {
 
     public StaticAsset findStaticAssetByFullUrl(String fullUrl);
 
+    Long findTotalStaticAssetCount();
+
     /**
      * <p>
      * Used when uploading a file to Broadleaf.    This method will create the corresponding 
@@ -89,6 +91,13 @@ public interface StaticAssetService {
      */
     @Deprecated
     public String getStaticAssetUrlPrefix();
+
+    /**
+     * Return a prefixed version of the given asset url, assuming a static asset url prefix is set
+     * @param assetUrl
+     * @return
+     */
+    public String getPrefixedStaticAssetUrl(String assetUrl);
 
     /**
      * @see StaticAssetPathService#getStaticAssetEnvironmentUrlPrefix()

@@ -24,8 +24,8 @@ import org.broadleafcommerce.common.copy.MultiTenantCopyContext;
 
 /**
  * A bean representation of a URLHandler
- * @author bpolster
  *
+ * @author bpolster
  */
 public class URLHandlerDTO implements URLHandler {
 
@@ -34,34 +34,60 @@ public class URLHandlerDTO implements URLHandler {
     protected String incomingURL = "";
     protected String newURL;
     protected String urlRedirectType;
+    protected boolean isRegex = false;
 
     public URLHandlerDTO(String newUrl, URLRedirectType redirectType) {
         setUrlRedirectType(redirectType);
         setNewURL(newUrl);
     }
 
+    @Override
     public Long getId() {
         return id;
     }
 
+    @Override
     public void setId(Long id) {
         this.id = id;
     }
 
+    @Override
     public String getIncomingURL() {
         return incomingURL;
     }
 
+    @Override
     public void setIncomingURL(String incomingURL) {
         this.incomingURL = incomingURL;
     }
 
+    @Override
     public String getNewURL() {
         return newURL;
     }
 
+    @Override
     public void setNewURL(String newURL) {
         this.newURL = newURL;
+    }
+
+    @Override
+    public boolean isRegexHandler() {
+        return isRegex;
+    }
+
+    /**
+     * @Deprecated use {@link #setRegexHandler(Boolean regexHandler)}
+     */
+    @Deprecated
+    @Override
+    public void setRegexHandler(boolean regexHandler) {
+        this.isRegex = regexHandler;
+    }
+
+    @Override
+    public void setRegexHandler(Boolean regexHandler) {
+        this.isRegex = regexHandler != null ? regexHandler : false;
     }
 
     @Override
@@ -71,7 +97,7 @@ public class URLHandlerDTO implements URLHandler {
 
     @Override
     public void setUrlRedirectType(URLRedirectType redirectType) {
-        this.urlRedirectType = redirectType.getType();
+        this.urlRedirectType = redirectType == null ? null : redirectType.getType();
     }
 
     @Override
@@ -83,7 +109,8 @@ public class URLHandlerDTO implements URLHandler {
         URLHandler cloned = createResponse.getClone();
         cloned.setIncomingURL(incomingURL);
         cloned.setNewURL(newURL);
-        cloned.setUrlRedirectType( URLRedirectType.getInstance(urlRedirectType));
-        return  createResponse;
+        cloned.setUrlRedirectType(URLRedirectType.getInstance(urlRedirectType));
+        cloned.setRegexHandler(new Boolean(isRegex));
+        return createResponse;
     }
 }

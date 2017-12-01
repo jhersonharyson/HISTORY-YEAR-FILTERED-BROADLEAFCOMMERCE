@@ -17,7 +17,10 @@
  */
 package org.broadleafcommerce.admin.web.rulebuilder.service;
 
+import org.broadleafcommerce.admin.web.controller.entity.AdminCategoryController;
 import org.broadleafcommerce.common.presentation.RuleIdentifier;
+import org.broadleafcommerce.common.presentation.RuleOperatorType;
+import org.broadleafcommerce.common.presentation.RuleOptionType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.openadmin.web.rulebuilder.dto.FieldData;
 import org.broadleafcommerce.openadmin.web.rulebuilder.service.AbstractRuleBuilderFieldService;
@@ -38,30 +41,38 @@ public class ProductFieldServiceImpl extends AbstractRuleBuilderFieldService {
         fields.add(new FieldData.Builder()
                 .label("rule_productUrl")
                 .name("url")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
                 .build());
         fields.add(new FieldData.Builder()
                 .label("rule_productManufacturer")
                 .name("manufacturer")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
                 .build());
         fields.add(new FieldData.Builder()
                 .label("rule_productSkuName")
                 .name("defaultSku.name")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
                 .build());
         fields.add(new FieldData.Builder()
                 .label("rule_productSkuLongDescription")
                 .name("defaultSku.longDescription")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
+                .build());
+        fields.add(new FieldData.Builder()
+                .label("rule_productCategory")
+                .name("allParentCategoryIds")
+                .operators(RuleOperatorType.SELECTIZE)
+                .selectizeSectionKey(AdminCategoryController.SECTION_KEY)
+                .options("[]")
+                .type(SupportedFieldType.COLLECTION)
                 .build());
     }
 

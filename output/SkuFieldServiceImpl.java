@@ -17,7 +17,11 @@
  */
 package org.broadleafcommerce.admin.web.rulebuilder.service;
 
+import org.broadleafcommerce.admin.web.controller.entity.AdminCategoryController;
+import org.broadleafcommerce.admin.web.controller.entity.AdminProductController;
 import org.broadleafcommerce.common.presentation.RuleIdentifier;
+import org.broadleafcommerce.common.presentation.RuleOperatorType;
+import org.broadleafcommerce.common.presentation.RuleOptionType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.openadmin.web.rulebuilder.dto.FieldData;
 import org.broadleafcommerce.openadmin.web.rulebuilder.service.AbstractRuleBuilderFieldService;
@@ -39,30 +43,39 @@ public class SkuFieldServiceImpl extends AbstractRuleBuilderFieldService {
         fields.add(new FieldData.Builder()
                 .label("rule_skuName")
                 .name("name")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.SELECTIZE)
+                .selectizeSectionKey(AdminProductController.SECTION_KEY)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
                 .build());
         fields.add(new FieldData.Builder()
                 .label("rule_skuLongDescription")
                 .name("longDescription")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
                 .build());
         fields.add(new FieldData.Builder()
                 .label("rule_skuProductUrl")
                 .name("product.url")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
                 .build());
         fields.add(new FieldData.Builder()
                 .label("rule_skuProductManufacturer")
                 .name("product.manufacturer")
-                .operators("blcOperators_Text")
-                .options("[]")
+                .operators(RuleOperatorType.TEXT)
+                .options(RuleOptionType.EMPTY_COLLECTION)
                 .type(SupportedFieldType.STRING)
+                .build());
+        fields.add(new FieldData.Builder()
+                .label("rule_productCategory")
+                .name("product.allParentCategoryIds")
+                .operators(RuleOperatorType.SELECTIZE)
+                .selectizeSectionKey(AdminCategoryController.SECTION_KEY)
+                .options(RuleOptionType.EMPTY_COLLECTION)
+                .type(SupportedFieldType.COLLECTION)
                 .build());
     }
 

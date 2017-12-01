@@ -17,6 +17,10 @@
  */
 package org.broadleafcommerce.openadmin.server.security.service;
 
+import net.sf.ehcache.Cache;
+import net.sf.ehcache.CacheManager;
+import net.sf.ehcache.Element;
+
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -40,6 +44,7 @@ import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.broadleafcommerce.openadmin.server.security.domain.ForgotPasswordSecurityToken;
 import org.broadleafcommerce.openadmin.server.security.domain.ForgotPasswordSecurityTokenImpl;
 import org.broadleafcommerce.openadmin.server.security.service.type.PermissionType;
+import org.broadleafcommerce.openadmin.server.security.service.user.AdminUserDetails;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -97,6 +102,10 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
      * <p>Set by {@link #setupPasswordEncoder()} if the blPasswordEncoder bean provided is the new version.
      */
     protected PasswordEncoder passwordEncoderNew;
+
+    protected static String CACHE_NAME = "blSecurityElements";
+    protected static String CACHE_KEY_PREFIX = "security:";
+    protected Cache cache = CacheManager.getInstance().getCache(CACHE_NAME);
 
     /**
      * <p>This is simply a placeholder to be used by {@link #setupPasswordEncoder()} to determine if we're using the
@@ -167,18 +176,21 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     @Transactional("blTransactionManager")
     public void deleteAdminPermission(AdminPermission permission) {
         adminPermissionDao.deleteAdminPermission(permission);
+        clearAdminSecurityCache();
     }
 
     @Override
     @Transactional("blTransactionManager")
     public void deleteAdminRole(AdminRole role) {
         adminRoleDao.deleteAdminRole(role);
+        clearAdminSecurityCache();
     }
 
     @Override
     @Transactional("blTransactionManager")
     public void deleteAdminUser(AdminUser user) {
         adminUserDao.deleteAdminUser(user);
+        clearAdminSecurityCache();
     }
 
     @Override
@@ -199,13 +211,17 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     @Override
     @Transactional("blTransactionManager")
     public AdminPermission saveAdminPermission(AdminPermission permission) {
-        return adminPermissionDao.saveAdminPermission(permission);
+        permission = adminPermissionDao.saveAdminPermission(permission);
+        clearAdminSecurityCache();
+        return permission;
     }
 
     @Override
     @Transactional("blTransactionManager")
     public AdminRole saveAdminRole(AdminRole role) {
-        return adminRoleDao.saveAdminRole(role);
+        role = adminRoleDao.saveAdminRole(role);
+        clearAdminSecurityCache();
+        return role;
     }
 
     @Override
@@ -230,7 +246,17 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
             returnUser.setPassword(encodePassword(unencodedPassword, getSalt(returnUser, unencodedPassword)));
         }
 
-        return adminUserDao.saveAdminUser(returnUser);
+        returnUser = adminUserDao.saveAdminUser(returnUser);
+        clearAdminSecurityCache();
+        return returnUser;
+    }
+
+    @Override
+    public void clearAdminSecurityCache() {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Admin Security Cache DELETE");
+        }
+        cache.removeAll();
     }
 
     protected String generateSecurePassword() {
@@ -252,11 +278,41 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
 
     @Override
     public boolean isUserQualifiedForOperationOnCeilingEntity(AdminUser adminUser, PermissionType permissionType, String ceilingEntityFullyQualifiedName) {
-        boolean response = adminPermissionDao.isUserQualifiedForOperationOnCeilingEntity(adminUser, permissionType, ceilingEntityFullyQualifiedName);
-        if (!response) {
-            response = adminPermissionDao.isUserQualifiedForOperationOnCeilingEntityViaDefaultPermissions(ceilingEntityFullyQualifiedName);
+        Boolean response = null;
+        String cacheKey = buildCacheKey(adminUser, permissionType, ceilingEntityFullyQualifiedName);
+        Element cacheElement = cache.get(cacheKey);
+
+        if (cacheElement != null) {
+            response = (Boolean) cacheElement.getObjectValue();
+
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Admin Security Cache GET For: \"" + cacheKey + "\" = " + response);
+            }
         }
+        
+        if (response == null) {
+            response = adminPermissionDao.isUserQualifiedForOperationOnCeilingEntity(adminUser, permissionType, ceilingEntityFullyQualifiedName);
+
+            if (!response) {
+                response = adminPermissionDao.isUserQualifiedForOperationOnCeilingEntityViaDefaultPermissions(ceilingEntityFullyQualifiedName);
+            }
+
+            cacheElement = new Element(cacheKey, response);
+            cache.put(cacheElement);
+
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Admin Security Cache PUT For: \"" + cacheKey + "\" = " + response);
+            }
+        }
+        
         return response;
+    }
+
+    protected String buildCacheKey(AdminUser adminUser, PermissionType permissionType, String ceilingEntityFullyQualifiedName) {
+        return CACHE_KEY_PREFIX
+               + "user:" + adminUser.getId() + ","
+               + "permType:" + permissionType.getFriendlyType() + ","
+               + "ceiling:" + ceilingEntityFullyQualifiedName;
     }
 
     @Override

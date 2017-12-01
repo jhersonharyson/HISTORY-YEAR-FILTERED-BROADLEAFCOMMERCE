@@ -18,11 +18,13 @@
 package org.broadleafcommerce.openadmin.server.security.dao;
 
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
+import org.broadleafcommerce.common.persistence.Status;
 import org.broadleafcommerce.common.util.dao.TypedQueryBuilder;
 import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.hibernate.ejb.QueryHints;
 import org.springframework.stereotype.Repository;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -80,8 +82,19 @@ public class AdminUserDaoImpl implements AdminUserDao {
     public AdminUser readAdminUserByUserName(String userName) {
         TypedQuery<AdminUser> query = em.createNamedQuery("BC_READ_ADMIN_USER_BY_USERNAME", AdminUser.class);
         query.setHint(QueryHints.HINT_CACHEABLE, true);
+        query.setHint(QueryHints.HINT_CACHE_REGION, "blAdminSecurityVolatileQuery");
         query.setParameter("userName", userName);
         List<AdminUser> users = query.getResultList();
+        //TODO rewrite on streams when upgraded to java 8
+        Iterator<AdminUser> iterator = users.iterator();
+        while (iterator.hasNext()){
+            AdminUser user = iterator.next();
+            if(Status.class.isAssignableFrom(user.getClass())) {
+                if('Y' == ((Status)user).getArchived()) {
+                    iterator.remove();
+                }
+            }
+        }
         if (users != null && !users.isEmpty()) {
             return users.get(0);
         }
@@ -91,6 +104,7 @@ public class AdminUserDaoImpl implements AdminUserDao {
     public List<AdminUser> readAllAdminUsers() {
         TypedQuery<AdminUser> query = em.createNamedQuery("BC_READ_ALL_ADMIN_USERS", AdminUser.class);
         query.setHint(QueryHints.HINT_CACHEABLE, true);
+        query.setHint(QueryHints.HINT_CACHE_REGION, "blAdminSecurityVolatileQuery");
         return query.getResultList();
     }
 

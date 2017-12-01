@@ -22,7 +22,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.broadleafcommerce.common.admin.domain.AdminMainEntity;
-import org.broadleafcommerce.common.dao.GenericEntityDao;
 import org.broadleafcommerce.common.exception.ServiceException;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
 import org.broadleafcommerce.common.presentation.client.AddMethodType;
@@ -50,8 +49,11 @@ import org.broadleafcommerce.openadmin.dto.Property;
 import org.broadleafcommerce.openadmin.dto.SectionCrumb;
 import org.broadleafcommerce.openadmin.dto.TabMetadata;
 import org.broadleafcommerce.openadmin.exception.EntityNotFoundException;
+import org.broadleafcommerce.openadmin.server.dao.DynamicEntityDao;
+import org.broadleafcommerce.openadmin.server.domain.FetchPageRequest;
 import org.broadleafcommerce.openadmin.server.domain.PersistencePackageRequest;
 import org.broadleafcommerce.openadmin.server.factory.PersistencePackageFactory;
+import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceManagerFactory;
 import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceResponse;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.BasicPersistenceModule;
 import org.broadleafcommerce.openadmin.web.form.entity.DynamicEntityFormInfo;
@@ -92,9 +94,6 @@ public class AdminEntityServiceImpl implements AdminEntityService {
 
     @Resource(name = "blEntityConfiguration")
     protected EntityConfiguration entityConfiguration;
-    
-    @Resource(name = "blGenericEntityDao")
-    protected GenericEntityDao genericEntityDao;
 
     protected DynamicDaoHelper dynamicDaoHelper = new DynamicDaoHelperImpl();
 
@@ -315,17 +314,22 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         return getRecordsForCollection(containingClassMetadata, containingEntity, collectionProperty, fascs, startIndex, 
                 maxIndex, null, sectionCrumb);
     }
-    
+
     @Override
-    public PersistenceResponse getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
-            Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex,
+    public PersistenceResponse getPagedRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
+            Property collectionProperty, FilterAndSortCriteria[] fascs, FetchPageRequest fetchPageRequest,
             String idValueOverride, List<SectionCrumb> sectionCrumbs) throws ServiceException {
-        
         PersistencePackageRequest ppr = PersistencePackageRequest.fromMetadata(collectionProperty.getMetadata(), sectionCrumbs)
-                .withFilterAndSortCriteria(fascs)
-                .withStartIndex(startIndex)
-                .withMaxIndex(maxIndex);
-        
+            .withFilterAndSortCriteria(fascs)
+            .withStartIndex(fetchPageRequest.getStartIndex())
+            .withMaxIndex(fetchPageRequest.getMaxIndex())
+            .withFirstId(fetchPageRequest.getFirstId())
+            .withLastId(fetchPageRequest.getLastId())
+            .withLowerCount(fetchPageRequest.getLowerCount())
+            .withUpperCount(fetchPageRequest.getUpperCount())
+            .withPageSize(fetchPageRequest.getPageSize())
+            .withPresentationFetch(true);
+
         FilterAndSortCriteria fasc;
 
         FieldMetadata md = collectionProperty.getMetadata();
@@ -360,6 +364,15 @@ public class AdminEntityServiceImpl implements AdminEntityService {
 
         return fetch(ppr);
     }
+    
+    @Override
+    public PersistenceResponse getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
+            Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex,
+            String idValueOverride, List<SectionCrumb> sectionCrumbs) throws ServiceException {
+        FetchPageRequest pageRequest = new FetchPageRequest().withStartIndex(startIndex).withMaxIndex(maxIndex);
+        return getPagedRecordsForCollection(containingClassMetadata, containingEntity, collectionProperty, fascs,
+                pageRequest, idValueOverride, sectionCrumbs);
+    }
 
     @Override
     public Map<String, DynamicResultSet> getRecordsForAllSubCollections(PersistencePackageRequest ppr, Entity containingEntity, Integer startIndex, Integer maxIndex, List<SectionCrumb> sectionCrumb)
@@ -376,6 +389,23 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             }
         }
 
+        return map;
+    }
+
+    @Override
+    public Map<String, DynamicResultSet> getAllRecordsForAllSubCollections(ClassMetadata cmd, Entity containingEntity,
+                                                                           List<SectionCrumb> sectionCrumb) throws ServiceException {
+        Map<String, DynamicResultSet> map = new HashMap<>();
+        for (Property p : cmd.getProperties()) {
+            FieldMetadata fieldMetadata = p.getMetadata();
+            boolean fieldAvailable = ArrayUtils.contains(fieldMetadata.getAvailableToTypes(), containingEntity.getType()[0]);
+            if (fieldAvailable && fieldMetadata instanceof CollectionMetadata) {
+                FetchPageRequest pageRequest = new FetchPageRequest()
+                        .withPageSize(Integer.MAX_VALUE);
+                PersistenceResponse resp = getPagedRecordsForCollection(cmd, containingEntity, p, null, pageRequest, null, sectionCrumb);
+                map.put(p.getName(), resp.getDynamicResultSet());
+            }
+        }
         return map;
     }
 
@@ -407,10 +437,12 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 updateTabInfo(collectionMetadata, cmd, tabName, tabOrder);
 
                 if (collectionMetadata.getLazyFetch() != null && collectionMetadata.getLazyFetch()
-                        && tabName.toUpperCase().startsWith(currentTabName.toUpperCase())) {
+                        && tabName.toUpperCase().startsWith(currentTabName.toUpperCase())
+                        && !collectionMetadata.getManualFetch()) {
                     PersistenceResponse response2 = getRecordsForCollection(cmd, containingEntity, p, null, null, null, sectionCrumb);
                     map.put(p.getName(), response2.getDynamicResultSet());
-                } else if (collectionMetadata.getLazyFetch() != null && !collectionMetadata.getLazyFetch()) {
+                } else if (collectionMetadata.getLazyFetch() != null && !collectionMetadata.getLazyFetch()
+                        && !collectionMetadata.getManualFetch()) {
                     PersistenceResponse response2 = getRecordsForCollection(cmd, containingEntity, p, null, null, null, sectionCrumb);
                     map.put(p.getName(), response2.getDynamicResultSet());
                 } else {
@@ -566,6 +598,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
 
         if (md instanceof BasicCollectionMetadata) {
             BasicCollectionMetadata fmd = (BasicCollectionMetadata) md;
+            ppr.setCeilingEntityClassname(fmd.getCollectionCeilingEntity());
             ppr.getEntity().setType(new String[] { fmd.getCollectionCeilingEntity() });
 
             Property fp = new Property();
@@ -575,7 +608,10 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 properties.add(fp);
             }
         } else if (md instanceof AdornedTargetCollectionMetadata) {
-            ppr.getEntity().setType(new String[] { ppr.getAdornedList().getAdornedTargetEntityClassname() });
+            String adornedTargetEntityClassname = ppr.getAdornedList().getAdornedTargetEntityClassname();
+            ppr.setCeilingEntityClassname(adornedTargetEntityClassname);
+            ppr.getEntity().setType(new String[] {adornedTargetEntityClassname});
+
             for (Property property : properties) {
                 if (property.getName().equals(ppr.getAdornedList().getLinkedObjectPath() +
                                     "." + ppr.getAdornedList().getLinkedIdProperty())) {
@@ -603,7 +639,6 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                     " not a collection field.", field.getName(), mainMetadata.getCeilingType()));
         }
 
-        ppr.setCeilingEntityClassname(ppr.getEntity().getType()[0]);
         String sectionField = field.getName();
         if (sectionField.contains(".")) {
             sectionField = sectionField.substring(0, sectionField.lastIndexOf("."));
@@ -912,11 +947,21 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         }
         
         if (request.getMaxIndex() != null) {
-            int requestedMaxResults = request.getMaxIndex() - request.getStartIndex() + 1;
+            Integer startIndex = request.getStartIndex() != null ? request.getStartIndex() : 0;
+            int requestedMaxResults = request.getMaxIndex() - startIndex + 1;
             if (requestedMaxResults >= 0 && requestedMaxResults < cto.getMaxResults()) {
                 cto.setMaxResults(requestedMaxResults);
             }
         }
+
+        cto.setLastId(request.getLastId());
+        cto.setFirstId(request.getFirstId());
+        cto.setUpperCount(request.getUpperCount());
+        cto.setLowerCount(request.getLowerCount());
+        if (request.getPageSize() != null) {
+            cto.setMaxResults(request.getPageSize());
+        }
+        cto.setPresentationFetch(request.getPresentationFetch());
         
         return service.fetch(pkg, cto);
     }
@@ -932,15 +977,20 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         if (owningClass == null || id == null) {
             return null;
         }
-        
-        Class<?> clazz = genericEntityDao.getImplClass(owningClass);
-        Object foreignEntity = genericEntityDao.readGenericEntity(clazz, id);
+
+        DynamicEntityDao dynamicEntityDao = getDynamicEntityDao(owningClass);
+        Class<?> clazz = dynamicEntityDao.getImplClass(owningClass);
+        Object foreignEntity = dynamicEntityDao.find(clazz, id);
 
         if (foreignEntity instanceof AdminMainEntity) {
             return ((AdminMainEntity) foreignEntity).getMainEntityName();
         }
         
         return null;
+    }
+
+    protected DynamicEntityDao getDynamicEntityDao(String owningClass) {
+        return PersistenceManagerFactory.getPersistenceManager(owningClass).getDynamicEntityDao();
     }
 
     protected int getDefaultMaxResults() {

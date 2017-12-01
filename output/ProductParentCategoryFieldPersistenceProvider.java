@@ -23,6 +23,7 @@ import org.broadleafcommerce.admin.server.service.persistence.module.provider.ex
         .ProductParentCategoryFieldPersistenceProviderExtensionManager;
 import org.broadleafcommerce.common.extension.ExtensionResultStatusType;
 import org.broadleafcommerce.common.service.ParentCategoryLegacyModeServiceImpl;
+import org.broadleafcommerce.common.web.BroadleafRequestContext;
 import org.broadleafcommerce.core.catalog.domain.Category;
 import org.broadleafcommerce.core.catalog.domain.CategoryImpl;
 import org.broadleafcommerce.core.catalog.domain.CategoryProductXref;
@@ -64,9 +65,9 @@ public class ProductParentCategoryFieldPersistenceProvider extends FieldPersiste
             ExtensionResultStatusType result = extensionManager.getProxy().manageParentCategory(populateValueRequest.getProperty(), (Product) instance);
             handled = ExtensionResultStatusType.NOT_HANDLED != result;
         }
-        if (!handled) {
+        if (!handled || BroadleafRequestContext.getBroadleafRequestContext().isProductionSandBox()) {
             Long requestedValue = null;
-            if (!StringUtils.isEmpty(populateValueRequest.getRequestedValue())) {
+            if (StringUtils.isNotEmpty(populateValueRequest.getRequestedValue())) {
                 requestedValue = Long.parseLong(populateValueRequest.getRequestedValue());
             }
             boolean dirty = checkDirtyState((Product) instance, requestedValue);
