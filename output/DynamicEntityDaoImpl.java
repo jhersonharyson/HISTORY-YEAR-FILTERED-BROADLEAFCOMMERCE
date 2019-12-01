@@ -32,7 +32,7 @@ import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.common.presentation.client.VisibilityEnum;
 import org.broadleafcommerce.common.util.dao.DynamicDaoHelper;
 import org.broadleafcommerce.common.util.dao.DynamicDaoHelperImpl;
-import org.broadleafcommerce.common.util.dao.HibernateMappingProvider;
+import org.broadleafcommerce.common.util.dao.EJB3ConfigurationDao;
 import org.broadleafcommerce.openadmin.dto.BasicCollectionMetadata;
 import org.broadleafcommerce.openadmin.dto.BasicFieldMetadata;
 import org.broadleafcommerce.openadmin.dto.ClassMetadata;
@@ -50,7 +50,8 @@ import org.broadleafcommerce.openadmin.server.service.persistence.validation.Fie
 import org.broadleafcommerce.openadmin.server.service.type.MetadataProviderResponse;
 import org.hibernate.Criteria;
 import org.hibernate.MappingException;
-import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.ejb.HibernateEntityManager;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 import org.hibernate.type.ComponentType;
@@ -120,6 +121,8 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
 
     protected EntityManager standardEntityManager;
 
+    protected EJB3ConfigurationDao ejb3ConfigurationDao;
+
     @Resource(name="blMetadata")
     protected Metadata metadata;
 
@@ -150,6 +153,9 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
 
     protected ApplicationContext applicationContext;
 
+
+    protected FieldManager fieldManager;
+
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
@@ -157,7 +163,7 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
 
     @Override
     public Criteria createCriteria(Class<?> entityClass) {
-        return getStandardEntityManager().unwrap(Session.class).createCriteria(entityClass);
+        return ((HibernateEntityManager) getStandardEntityManager()).getSession().createCriteria(entityClass);
     }
 
     @Override
@@ -212,7 +218,7 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
 
     @Override
     public PersistentClass getPersistentClass(String targetClassName) {
-        return HibernateMappingProvider.getMapping(targetClassName);
+        return ejb3ConfigurationDao.getConfiguration().getClassMapping(targetClassName);
     }
 
     @Override
@@ -243,12 +249,13 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
 
     @Override
     public Class<?>[] getAllPolymorphicEntitiesFromCeiling(Class<?> ceilingClass, boolean includeUnqualifiedPolymorphicEntities) {
-        return dynamicDaoHelper.getAllPolymorphicEntitiesFromCeiling(ceilingClass, includeUnqualifiedPolymorphicEntities, useCache());
+        return dynamicDaoHelper.getAllPolymorphicEntitiesFromCeiling(ceilingClass, getSessionFactory(),
+            includeUnqualifiedPolymorphicEntities, useCache());
     }
 
     @Override
     public Class<?>[] getUpDownInheritance(Class<?> testClass) {
-        return dynamicDaoHelper.getUpDownInheritance(testClass, true, useCache());
+        return dynamicDaoHelper.getUpDownInheritance(testClass, getSessionFactory(), true, useCache(), ejb3ConfigurationDao);
     }
 
     @Override
@@ -333,11 +340,11 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
 
     @Override
     public Serializable getIdentifier(Object entity) {
-        return dynamicDaoHelper.getIdentifier(entity);
+        return dynamicDaoHelper.getIdentifier(entity, standardEntityManager);
     }
 
     protected Field getIdField(Class<?> clazz) {
-        return dynamicDaoHelper.getIdField(clazz);
+        return dynamicDaoHelper.getIdField(clazz, standardEntityManager);
     }
 
     public Class<?>[] sortEntities(Class<?> ceilingClass, List<Class<?>> entities) {
@@ -903,18 +910,23 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
     }
 
     @Override
+    public SessionFactory getSessionFactory() {
+        return dynamicDaoHelper.getSessionFactory((HibernateEntityManager) standardEntityManager);
+    }
+
+    @Override
     public Map<String, Object> getIdMetadata(Class<?> entityClass) {
-        return dynamicDaoHelper.getIdMetadata(entityClass, standardEntityManager);
+        return dynamicDaoHelper.getIdMetadata(entityClass, (HibernateEntityManager) standardEntityManager);
     }
 
     @Override
     public List<String> getPropertyNames(Class<?> entityClass) {
-        return dynamicDaoHelper.getPropertyNames(entityClass);
+        return dynamicDaoHelper.getPropertyNames(entityClass, (HibernateEntityManager) standardEntityManager);
     }
 
     @Override
     public List<Type> getPropertyTypes(Class<?> entityClass) {
-        return dynamicDaoHelper.getPropertyTypes(entityClass);
+        return dynamicDaoHelper.getPropertyTypes(entityClass, (HibernateEntityManager) standardEntityManager);
     }
 
     @Override
@@ -1561,11 +1573,29 @@ public class DynamicEntityDaoImpl implements DynamicEntityDao, ApplicationContex
     @Override
     public void setStandardEntityManager(EntityManager entityManager) {
         this.standardEntityManager = entityManager;
+        fieldManager = new FieldManager(entityConfiguration, entityManager);
+    }
+
+    @Override
+    public EJB3ConfigurationDao getEjb3ConfigurationDao() {
+        return ejb3ConfigurationDao;
+    }
+
+    @Override
+    public void setEjb3ConfigurationDao(EJB3ConfigurationDao ejb3ConfigurationDao) {
+        this.ejb3ConfigurationDao = ejb3ConfigurationDao;
     }
 
     @Override
     public FieldManager getFieldManager() {
-        return new FieldManager(entityConfiguration, getStandardEntityManager());
+        if (fieldManager == null) {
+            //keep in mind that getStandardEntityManager() can return null, this is in general OK,
+            // we re-init fieldManager in setStandardEntityManager method
+            fieldManager = new FieldManager(entityConfiguration, getStandardEntityManager());
+        } else {
+            fieldManager.clearMiddleFields();
+        }
+        return fieldManager;
     }
 
     @Override

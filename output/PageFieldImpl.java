@@ -83,7 +83,7 @@ public class PageFieldImpl implements PageField, ProfileEntity {
 
     @Column(name = "LOB_VALUE", length = Integer.MAX_VALUE-1)
     @Lob
-    @Type(type = "org.hibernate.type.MaterializedClobType")
+    @Type(type = "org.hibernate.type.StringClobType")
     @AdminPresentation
     protected String lobValue;
 

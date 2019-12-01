@@ -80,7 +80,7 @@ public class StructuredContentFieldImpl implements StructuredContentField, Profi
     @AdminPresentation
     @Column (name = "LOB_VALUE", length = Integer.MAX_VALUE - 1)
     @Lob
-    @Type(type = "org.hibernate.type.MaterializedClobType")
+    @Type(type = "org.hibernate.type.StringClobType")
     protected String lobValue;
 
     @Override

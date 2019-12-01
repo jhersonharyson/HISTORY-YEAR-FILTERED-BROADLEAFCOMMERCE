@@ -17,6 +17,10 @@
  */
 package org.broadleafcommerce.openadmin.server.security.service;
 
+import net.sf.ehcache.Cache;
+import net.sf.ehcache.CacheManager;
+import net.sf.ehcache.Element;
+
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -40,8 +44,14 @@ import org.broadleafcommerce.openadmin.server.security.domain.AdminUser;
 import org.broadleafcommerce.openadmin.server.security.domain.ForgotPasswordSecurityToken;
 import org.broadleafcommerce.openadmin.server.security.domain.ForgotPasswordSecurityTokenImpl;
 import org.broadleafcommerce.openadmin.server.security.service.type.PermissionType;
+import org.broadleafcommerce.openadmin.server.security.service.user.AdminUserDetails;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.dao.SaltSource;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,11 +62,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
-
-import net.sf.ehcache.Cache;
-import net.sf.ehcache.CacheManager;
-import net.sf.ehcache.Element;
 
 /**
  *
@@ -76,12 +83,25 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
 
     @Resource(name = "blAdminUserDao")
     protected AdminUserDao adminUserDao;
-
+    
     @Resource(name = "blForgotPasswordSecurityTokenDao")
     protected ForgotPasswordSecurityTokenDao forgotPasswordSecurityTokenDao;
 
     @Resource(name = "blAdminPermissionDao")
     protected AdminPermissionDao adminPermissionDao;
+
+    /**
+     * <p>Set by {@link #setupPasswordEncoder()} if the blPasswordEncoder bean provided is the deprecated version.
+     *
+     * @deprecated Spring Security has deprecated this encoder interface, this will be removed in 4.2
+     */
+    @Deprecated
+    protected org.springframework.security.authentication.encoding.PasswordEncoder passwordEncoder;
+
+    /**
+     * <p>Set by {@link #setupPasswordEncoder()} if the blPasswordEncoder bean provided is the new version.
+     */
+    protected PasswordEncoder passwordEncoderNew;
 
     protected static String CACHE_NAME = "blSecurityElements";
     protected static String CACHE_KEY_PREFIX = "security:";
@@ -92,8 +112,26 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
      * new {@link PasswordEncoder} or the deprecated {@link org.springframework.security.authentication.encoding.PasswordEncoder PasswordEncoder}
      */
     @Resource(name="blAdminPasswordEncoder")
-    protected PasswordEncoder passwordEncoderBean;
+    protected Object passwordEncoderBean;
 
+    /**
+     * Optional password salt to be used with the passwordEncoder
+     *
+     * @deprecated use {@link #saltSource} instead, this will be removed in 4.2
+     */
+    @Deprecated
+    protected String salt;
+    
+    /**
+     * Use a Salt Source ONLY if there's one configured
+     *
+     * @deprecated the new {@link PasswordEncoder} handles salting internally, this will be removed in 4.2
+     */
+    @Deprecated
+    @Autowired(required=false)
+    @Qualifier("blAdminSaltSource")
+    protected SaltSource saltSource;
+    
     @Resource(name="blEmailService")
     protected EmailService emailService;
 
@@ -103,9 +141,32 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     @Resource(name="blSendAdminUsernameEmailInfo")
     protected EmailInfo sendUsernameEmailInfo;
 
+    /**
+     * <p>Sets either {@link #passwordEncoder} or {@link #passwordEncoderNew} based on the type of {@link #passwordEncoderBean}
+     * in order to provide bean configuration backwards compatibility with the deprecated {@link org.springframework.security.authentication.encoding.PasswordEncoder PasswordEncoder} bean.
+     *
+     * <p>{@link #passwordEncoderBean} is set by the bean defined as "blPasswordEncoder".
+     *
+     * <p>This class will utilize either the new or deprecated PasswordEncoder type depending on which is not null.
+     *
+     * @throws NoSuchBeanDefinitionException if {@link #passwordEncoderBean} is null or not an instance of either PasswordEncoder
+     */
+    @PostConstruct
+    protected void setupPasswordEncoder() {
+        passwordEncoderNew = null;
+        passwordEncoder = null;
+        if (passwordEncoderBean instanceof PasswordEncoder) {
+            passwordEncoderNew = (PasswordEncoder) passwordEncoderBean;
+        } else if (passwordEncoderBean instanceof org.springframework.security.authentication.encoding.PasswordEncoder) {
+            passwordEncoder = (org.springframework.security.authentication.encoding.PasswordEncoder) passwordEncoderBean;
+        } else {
+            throw new NoSuchBeanDefinitionException("No PasswordEncoder bean is defined");
+        }
+    }
+
     protected int getTokenExpiredMinutes() {
         return BLCSystemProperty.resolveIntSystemProperty("tokenExpiredMinutes");
-    }
+    }    
 
     protected String getResetPasswordURL() {
         return BLCSystemProperty.resolveSystemProperty("resetPasswordURL");
@@ -182,7 +243,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
         AdminUser returnUser = adminUserDao.saveAdminUser(user);
 
         if (encodePasswordNeeded) {
-            returnUser.setPassword(encodePassword(unencodedPassword));
+            returnUser.setPassword(encodePassword(unencodedPassword, getSalt(returnUser, unencodedPassword)));
         }
 
         returnUser = adminUserDao.saveAdminUser(returnUser);
@@ -228,7 +289,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
                 LOG.trace("Admin Security Cache GET For: \"" + cacheKey + "\" = " + response);
             }
         }
-
+        
         if (response == null) {
             response = adminPermissionDao.isUserQualifiedForOperationOnCeilingEntity(adminUser, permissionType, ceilingEntityFullyQualifiedName);
 
@@ -243,7 +304,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
                 LOG.trace("Admin Security Cache PUT For: \"" + cacheKey + "\" = " + response);
             }
         }
-
+        
         return response;
     }
 
@@ -319,23 +380,23 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     public GenericResponse sendResetPasswordNotification(String username) {
         GenericResponse response = new GenericResponse();
         AdminUser user = null;
-
+        
         if (username != null) {
             user = adminUserDao.readAdminUserByUserName(username);
         }
-
+        
         checkUser(user,response);
-
-        if (! response.getHasErrors()) {
+        
+        if (! response.getHasErrors()) {        
             String token = PasswordUtils.generateSecurePassword(TEMP_PASSWORD_LENGTH);
             token = token.toLowerCase();
 
             ForgotPasswordSecurityToken fpst = new ForgotPasswordSecurityTokenImpl();
             fpst.setAdminUserId(user.getId());
-            fpst.setToken(encodePassword(token));
+            fpst.setToken(encodePassword(token, null));
             fpst.setCreateDate(SystemTime.asDate());
             forgotPasswordSecurityTokenDao.saveToken(fpst);
-
+            
             HashMap<String, Object> vars = new HashMap<String, Object>();
             vars.put("token", token);
             String resetPasswordUrl = getResetPasswordURL();
@@ -348,7 +409,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
             }
             vars.put("resetPasswordUrl", resetPasswordUrl);
             emailService.sendTemplateEmail(user.getEmail(), getResetPasswordEmailInfo(), vars);
-
+            
         }
         return response;
     }
@@ -372,7 +433,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
             token = token.toLowerCase();
             List<ForgotPasswordSecurityToken> fpstoks = forgotPasswordSecurityTokenDao.readUnusedTokensByAdminUserId(user.getId());
             for (ForgotPasswordSecurityToken fpstok : fpstoks) {
-                if (isPasswordValid(fpstok.getToken(), token)) {
+                if (isPasswordValid(fpstok.getToken(), token, null)) {
                     fpst = fpstok;
                     break;
                 }
@@ -421,7 +482,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
             response.addErrorCode("inactiveUser");
         }
     }
-
+    
     protected void checkPassword(String password, String confirmPassword, GenericResponse response) {
         if (StringUtils.isBlank(password) || StringUtils.isBlank(confirmPassword)) {
             response.addErrorCode("invalidPassword");
@@ -431,7 +492,7 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     }
 
     protected void checkExistingPassword(String unencodedPassword, AdminUser user, GenericResponse response) {
-        if (!isPasswordValid(user.getPassword(), unencodedPassword)) {
+        if (!isPasswordValid(user.getPassword(), unencodedPassword, getSalt(user, unencodedPassword))) {
             response.addErrorCode("invalidPassword");
         }
     }
@@ -468,6 +529,40 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
         this.resetPasswordEmailInfo = resetPasswordEmailInfo;
     }
 
+    @Deprecated
+    @Override
+    public Object getSalt(AdminUser user, String unencodedPassword) {
+        Object salt = null;
+        if (saltSource != null) {
+            salt = saltSource.getSalt(new AdminUserDetails(user.getId(), user.getLogin(), unencodedPassword, new ArrayList<GrantedAuthority>()));
+        }
+        return salt;
+    }
+
+    @Deprecated
+    @Override
+    public String getSalt() {
+        return salt;
+    }
+
+    @Deprecated
+    @Override
+    public void setSalt(String salt) {
+        this.salt = salt;
+    }
+
+    @Deprecated
+    @Override
+    public SaltSource getSaltSource() {
+        return saltSource;
+    }
+
+    @Deprecated
+    @Override
+    public void setSaltSource(SaltSource saltSource) {
+        this.saltSource = saltSource;
+    }
+
     @Override
     @Transactional("blTransactionManager")
     public GenericResponse changePassword(String username,
@@ -495,6 +590,31 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
     }
 
     /**
+     * Determines if a password is valid by comparing it to the encoded string, optionally using a salt.
+     * <p>
+     * The externally salted {@link org.springframework.security.authentication.encoding.PasswordEncoder PasswordEncoder} support is
+     * being deprecated, following in Spring Security's footsteps, in order to move towards self salting hashing algorithms such as bcrypt.
+     * Bcrypt is a superior hashing algorithm that randomly generates a salt per password in order to protect against rainbow table attacks
+     * and is an intentionally expensive algorithm to further guard against brute force attempts to crack hashed passwords.
+     * Additionally, having the encoding algorithm handle the salt internally reduces code complexity and dependencies such as {@link SaltSource}.
+     *
+     * @deprecated the new {@link PasswordEncoder} handles salting internally, this will be removed in 4.2
+     *
+     * @param encodedPassword the encoded password
+     * @param rawPassword the unencoded password
+     * @param salt the optional salt
+     * @return true if rawPassword matches the encodedPassword, false otherwise
+     */
+    @Deprecated
+    protected boolean isPasswordValid(String encodedPassword, String rawPassword, Object salt) {
+        if (usingDeprecatedPasswordEncoder()) {
+            return passwordEncoder.isPasswordValid(encodedPassword, rawPassword, salt);
+        } else {
+            return isPasswordValid(encodedPassword, rawPassword);
+        }
+    }
+
+    /**
      * Determines if a password is valid by comparing it to the encoded string, salting is handled internally to the {@link PasswordEncoder}.
      * <p>
      * This method must always be called to verify if a password is valid after the original encoded password is generated
@@ -505,11 +625,35 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
      * @return true if rawPassword matches the encodedPassword, false otherwise
      */
     protected boolean isPasswordValid(String encodedPassword, String rawPassword) {
-        return passwordEncoderBean.matches(rawPassword, encodedPassword);
+        return passwordEncoderNew.matches(rawPassword, encodedPassword);
     }
 
     /**
-     * Generate an encoded password from a raw password
+     * Generate an encoded password from a raw password, optionally using a salt.
+     * <p>
+     * The externally salted {@link org.springframework.security.authentication.encoding.PasswordEncoder PasswordEncoder} support is
+     * being deprecated, following in Spring Security's footsteps, in order to move towards self salting hashing algorithms such as bcrypt.
+     * Bcrypt is a superior hashing algorithm that randomly generates a salt per password in order to protect against rainbow table attacks
+     * and is an intentionally expensive algorithm to further guard against brute force attempts to crack hashed passwords.
+     * Additionally, having the encoding algorithm handle the salt internally reduces code complexity and dependencies such as {@link SaltSource}.
+     *
+     * @deprecated the new {@link PasswordEncoder} handles salting internally, this will be removed in 4.2
+     *
+     * @param rawPassword
+     * @param salt
+     * @return
+     */
+    @Deprecated
+    protected String encodePassword(String rawPassword, Object salt) {
+        if (usingDeprecatedPasswordEncoder()) {
+            return passwordEncoder.encodePassword(rawPassword, salt);
+        } else {
+            return encodePassword(rawPassword);
+        }
+    }
+
+    /**
+     * Generate an encoded password from a raw password, salting is handled internally to the {@link PasswordEncoder}.
      * <p>
      * This method can only be called once per password. The salt is randomly generated internally in the {@link PasswordEncoder}
      * and appended to the hash to provide the resulting encoded password. Once this has been called on a password,
@@ -520,6 +664,11 @@ public class AdminSecurityServiceImpl implements AdminSecurityService {
      * @return the encoded password
      */
     protected String encodePassword(String rawPassword) {
-        return passwordEncoderBean.encode(rawPassword);
+        return passwordEncoderNew.encode(rawPassword);
+    }
+
+    @Deprecated
+    protected boolean usingDeprecatedPasswordEncoder() {
+        return passwordEncoder != null;
     }
 }
