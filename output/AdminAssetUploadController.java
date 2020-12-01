@@ -100,7 +100,7 @@ public class AdminAssetUploadController extends AdminAbstractController {
         // We need these attributes to be set appropriately here
         model.addAttribute("entityId", id);
         model.addAttribute("sectionKey", sectionKey);
-        return "modules/modalContainer";
+        return MODAL_CONTAINER_VIEW;
     }
     
     @RequestMapping(value = "/{id}/uploadAsset", method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -136,7 +136,6 @@ public class AdminAssetUploadController extends AdminAbstractController {
         }
 
         HttpHeaders responseHeaders = new HttpHeaders();
-        responseHeaders.add("Content-Type", "text/html; charset=utf-8");
         return new ResponseEntity<Map<String, Object>>(responseMap, responseHeaders, HttpStatus.OK);
     }
 

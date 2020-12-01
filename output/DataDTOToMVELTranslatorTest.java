@@ -17,16 +17,21 @@
  */
 package org.broadleafcommerce.admin.web.rulebuilder;
 
-import junit.framework.TestCase;
 import org.broadleafcommerce.admin.web.rulebuilder.service.CustomerFieldServiceImpl;
 import org.broadleafcommerce.admin.web.rulebuilder.service.FulfillmentGroupFieldServiceImpl;
 import org.broadleafcommerce.admin.web.rulebuilder.service.OrderFieldServiceImpl;
 import org.broadleafcommerce.admin.web.rulebuilder.service.OrderItemFieldServiceImpl;
+import org.broadleafcommerce.common.presentation.RuleOperatorType;
+import org.broadleafcommerce.common.presentation.RuleOptionType;
+import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.openadmin.web.rulebuilder.BLCOperator;
 import org.broadleafcommerce.openadmin.web.rulebuilder.DataDTOToMVELTranslator;
 import org.broadleafcommerce.openadmin.web.rulebuilder.MVELTranslationException;
 import org.broadleafcommerce.openadmin.web.rulebuilder.dto.DataDTO;
 import org.broadleafcommerce.openadmin.web.rulebuilder.dto.ExpressionDTO;
+import org.broadleafcommerce.openadmin.web.rulebuilder.dto.FieldData;
+
+import junit.framework.TestCase;
 
 /**
  * @author Elbert Bautista (elbertbautista)
@@ -77,7 +82,7 @@ public class DataDTOToMVELTranslatorTest extends TestCase {
         expressionDTO.setValue("merchandise");
 
         String translated = translator.createMVEL("discreteOrderItem", expressionDTO, orderItemFieldService);
-        String mvel = "MvelHelper.toUpperCase(discreteOrderItem.?category.?name)==MvelHelper.toUpperCase(\"merchandise\")";
+        String mvel = "MvelHelper.toUpperCase(?discreteOrderItem.?category.?name)==MvelHelper.toUpperCase(\"merchandise\")";
         assert(mvel.equals(translated));
     }
 
@@ -153,7 +158,7 @@ public class DataDTOToMVELTranslatorTest extends TestCase {
         dataDTO.getRules().add(expressionDTO);
 
         String translated = translator.createMVEL("order", dataDTO, orderFieldService);
-        String mvel = "order.?subTotal.getAmount()>=100";
+        String mvel = "?order.?subTotal.getAmount()>=100";
         assert (mvel.equals(translated));
     }
 
@@ -200,7 +205,7 @@ public class DataDTOToMVELTranslatorTest extends TestCase {
         d1.getRules().add(d1e1);
 
         String d1Translated = translator.createMVEL("discreteOrderItem", d1, orderItemFieldService);
-        String d1Mvel = "discreteOrderItem.?category.?name==\"test category\"";
+        String d1Mvel = "?discreteOrderItem.?category.?name==\"test category\"";
         assert(d1Mvel.equals(d1Translated));
 
         DataDTO d2 = new DataDTO();
@@ -213,7 +218,7 @@ public class DataDTOToMVELTranslatorTest extends TestCase {
         d2.getRules().add(d2e1);
 
         String d2Translated = translator.createMVEL("discreteOrderItem", d2, orderItemFieldService);
-        String d2Mvel = "!(discreteOrderItem.?product.?manufacturer==\"test manufacturer\")";
+        String d2Mvel = "!(?discreteOrderItem.?product.?manufacturer==\"test manufacturer\")";
         assert (d2Mvel.equals(d2Translated));
 
     }
@@ -261,7 +266,7 @@ public class DataDTOToMVELTranslatorTest extends TestCase {
         dataDTO.getRules().add(e2);
 
         String translated = translator.createMVEL("fulfillmentGroup", dataDTO, fulfillmentGroupFieldService);
-        String mvel = "fulfillmentGroup.?address.?state.?name==\"Texas\"&&(fulfillmentGroup.?retailFulfillmentPrice.getAmount()>=99&&fulfillmentGroup.?retailFulfillmentPrice.getAmount()<=199)";
+        String mvel = "?fulfillmentGroup.?address.?state.?name==\"Texas\"&&(?fulfillmentGroup.?retailFulfillmentPrice.getAmount()>=99&&?fulfillmentGroup.?retailFulfillmentPrice.getAmount()<=199)";
         assert (mvel.equals(translated));
     }
 
@@ -278,7 +283,40 @@ public class DataDTOToMVELTranslatorTest extends TestCase {
         d1.getRules().add(d1e1);
 
         String d1Translated = translator.createMVEL("discreteOrderItem", d1, orderItemFieldService);
-        String d1Mvel = "CollectionUtils.intersection(discreteOrderItem.?category.?name,[\"test category\", \"test category 2\"]).size()>0";
+        String d1Mvel = "CollectionUtils.intersection(?discreteOrderItem.?category.?name,[\"test category\", \"test category 2\"]).size()>0";
+        assert(d1Mvel.equals(d1Translated));
+
+    }
+
+    public void testWithinDaysMVEL() throws MVELTranslationException {
+        DataDTOToMVELTranslator translator = new DataDTOToMVELTranslator();
+
+        DataDTO d1 = new DataDTO();
+        d1.setQuantity(0);
+        d1.setCondition(BLCOperator.AND.name());
+        ExpressionDTO d1e1 = new ExpressionDTO();
+        d1e1.setId("getCustomerAttributes()---invoice_date");
+        d1e1.setOperator(BLCOperator.WITHIN_DAYS.name());
+        d1e1.setValue("12");
+        d1.getRules().add(d1e1);
+
+        customerFieldService.getFields().add(new FieldData.Builder()
+                .label("Customer - invoice date")
+                .name("getCustomerAttributes()---invoice_date")
+                .operators(RuleOperatorType.DATE)
+                .options(RuleOptionType.EMPTY_COLLECTION)
+                .type(SupportedFieldType.DATE)
+                .build());
+
+        String d1Translated = translator.createMVEL("customer", d1, customerFieldService);
+        
+        String d1Mvel = "(MvelHelper.convertField(\"DATE\",?customer.?getCustomerAttributes()[\"invoice_date\"])" +
+                ">MvelHelper.convertField(\"DATE\",MvelHelper.subtractFromCurrentTime(12))" +
+                "&&MvelHelper.convertField(\"DATE\",?customer.?getCustomerAttributes()[\"invoice_date\"])" +
+                "<MvelHelper.convertField(\"DATE\",MvelHelper.currentTime()))";
+
+        customerFieldService.init();
+        
         assert(d1Mvel.equals(d1Translated));
 
     }

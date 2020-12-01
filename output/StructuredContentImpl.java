@@ -101,6 +101,8 @@ import javax.persistence.Transient;
 public class StructuredContentImpl implements StructuredContent, AdminMainEntity, ProfileEntity {
 
     private static final long serialVersionUID = 1L;
+    
+    public static final String SC_DONT_DUPLICATE_SC_TYPE_HINT = "dont-duplicate-sc-type";
 
     @Id
     @GeneratedValue(generator = "StructuredContentId")
@@ -137,7 +139,9 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     protected Integer priority;
 
     @ManyToMany(targetEntity = StructuredContentRuleImpl.class, cascade = {CascadeType.ALL})
-    @JoinTable(name = "BLC_SC_RULE_MAP", inverseJoinColumns = @JoinColumn(name = "SC_RULE_ID", referencedColumnName = "SC_RULE_ID"))
+    @JoinTable(name = "BLC_SC_RULE_MAP", 
+               joinColumns = @JoinColumn(name = "BLC_SC_SC_ID", referencedColumnName = "SC_ID"),
+               inverseJoinColumns = @JoinColumn(name = "SC_RULE_ID", referencedColumnName = "SC_RULE_ID"))
     @Cascade(value={org.hibernate.annotations.CascadeType.ALL, org.hibernate.annotations.CascadeType.DELETE_ORPHAN})
     @MapKeyColumn(name = "MAP_KEY", nullable = false)
     @Cache(usage= CacheConcurrencyStrategy.NONSTRICT_READ_WRITE, region="blCMSElements")
@@ -159,7 +163,7 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
     @AdminPresentationToOneLookup(lookupDisplayProperty = "name", forcePopulateChildProperties = true)
     protected StructuredContentType structuredContentType;
 
-    @OneToMany(mappedBy = "structuredContent", targetEntity = StructuredContentFieldXrefImpl.class, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "structuredContent", targetEntity = StructuredContentFieldXrefImpl.class, cascade = CascadeType.ALL)
     @MapKey(name = "key")
     @BatchSize(size = 20)
     @AdminPresentationMap(forceFreeFormKeys = true, friendlyName = "structuredContentFields")
@@ -331,21 +335,30 @@ public class StructuredContentImpl implements StructuredContent, AdminMainEntity
         cloned.setLocale(locale);
         cloned.setOfflineFlag(offlineFlag);
         cloned.setPriority(priority);
+        
         if (structuredContentType != null) {
-            CreateResponse<StructuredContentType> clonedType = structuredContentType.createOrRetrieveCopyInstance(context);
-            cloned.setStructuredContentType(clonedType.getClone());
+            if (Boolean.valueOf(context.getCopyHints().get(SC_DONT_DUPLICATE_SC_TYPE_HINT))) {
+                cloned.setStructuredContentType(structuredContentType);
+            } else {
+                CreateResponse<StructuredContentType> clonedType = 
+                        structuredContentType.createOrRetrieveCopyInstance(context);
+                cloned.setStructuredContentType(clonedType.getClone());
+            }
         }
+        
         for(StructuredContentItemCriteria itemCriteria : qualifyingItemCriteria){
             CreateResponse<StructuredContentItemCriteria> clonedItem = itemCriteria.createOrRetrieveCopyInstance(context);
             StructuredContentItemCriteria clonedCritera = clonedItem.getClone();
             cloned.getQualifyingItemCriteria().add(clonedCritera);
         }
+        
         for(Entry<String, StructuredContentRule> entry : structuredContentMatchRules.entrySet()){
             CreateResponse<StructuredContentRule> clonedItem = entry.getValue().createOrRetrieveCopyInstance(context);
             StructuredContentRule clonedRule = clonedItem.getClone();
             cloned.getStructuredContentMatchRules().put(entry.getKey(),clonedRule);
 
         }
+        
         for(Entry<String, StructuredContentFieldXref> entry : structuredContentFields.entrySet() ){
             CreateResponse<StructuredContentFieldXref> clonedItem = entry.getValue().createOrRetrieveCopyInstance(context);
             StructuredContentFieldXref clonedContentFieldXref = clonedItem.getClone();

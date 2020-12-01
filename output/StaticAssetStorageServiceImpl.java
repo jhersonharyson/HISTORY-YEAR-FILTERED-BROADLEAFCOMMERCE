@@ -18,8 +18,6 @@
 package org.broadleafcommerce.cms.file.service;
 
 import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.io.FileExistsException;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -45,7 +43,7 @@ import org.broadleafcommerce.openadmin.server.service.artifact.ArtifactService;
 import org.broadleafcommerce.openadmin.server.service.artifact.image.Operation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.web.MultipartProperties;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -532,5 +530,13 @@ public class StaticAssetStorageServiceImpl implements StaticAssetStorageService 
     protected List<String> getAdminImageFileExtensions() {
         String extensions = env.getProperty("admin.image.file.extensions", String.class, DEFAULT_ADMIN_IMAGE_EXTENSIONS);
         return Arrays.asList(extensions.split(","));
+    }
+
+    @Override
+    public void validateFileSize(MultipartFile file) throws IOException {
+        long maxSize = getMaxUploadSizeForFile(file.getOriginalFilename());
+        if (file.getSize() > maxSize) {
+            throw new IOException("Maximum Upload File Size Exceeded");
+        }
     }
 }

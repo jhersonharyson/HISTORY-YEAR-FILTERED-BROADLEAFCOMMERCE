@@ -22,15 +22,17 @@ import org.broadleafcommerce.admin.server.service.handler.ProductCustomPersisten
 import org.broadleafcommerce.common.exception.ServiceException;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.common.web.BroadleafRequestContext;
+import org.broadleafcommerce.common.web.JsonResponse;
 import org.broadleafcommerce.core.catalog.domain.Category;
 import org.broadleafcommerce.core.catalog.domain.Product;
-import org.broadleafcommerce.core.catalog.domain.ProductBundle;
+import org.broadleafcommerce.core.catalog.domain.ProductOption;
+import org.broadleafcommerce.core.catalog.domain.ProductOptionXref;
 import org.broadleafcommerce.core.catalog.domain.Sku;
 import org.broadleafcommerce.core.catalog.domain.SkuImpl;
 import org.broadleafcommerce.core.catalog.service.CatalogService;
+import org.broadleafcommerce.core.catalog.service.type.ProductType;
 import org.broadleafcommerce.openadmin.dto.BasicCollectionMetadata;
 import org.broadleafcommerce.openadmin.dto.ClassMetadata;
-import org.broadleafcommerce.openadmin.dto.ClassTree;
 import org.broadleafcommerce.openadmin.dto.CriteriaTransferObject;
 import org.broadleafcommerce.openadmin.dto.DynamicResultSet;
 import org.broadleafcommerce.openadmin.dto.Entity;
@@ -49,16 +51,19 @@ import org.broadleafcommerce.openadmin.web.form.entity.Field;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.MultiValueMap;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import java.net.URLDecoder;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -77,6 +82,9 @@ public class AdminProductController extends AdminBasicEntityController {
     public static final String SECTION_KEY = "product";
     public static final String DEFAULT_SKU_NAME = "defaultSku.name";
     public static final String SELECTIZE_NAME_PROPERTY = "name";
+    public static final String PRODUCT_OPTIONS_COLLECTION_FIELD = "productOptions";
+    private static final String  PRODUCT_OPTION_ID_FIELD_KEY = "productOption.id";
+    private static final String PRODUCT_ID_FIELD_KEY = "product.id";
 
     @Resource(name = "blCatalogService")
     protected CatalogService catalogService;
@@ -134,32 +142,14 @@ public class AdminProductController extends AdminBasicEntityController {
         if (request.getParameter("entityType") != null) {
             entityType = request.getParameter("entityType");
         }
-        if (StringUtils.isBlank(entityType)) {
-            if (cmd.getPolymorphicEntities().getChildren().length == 0) {
-                entityType = cmd.getPolymorphicEntities().getFullyQualifiedClassname();
-            } else {
-                entityType = getDefaultEntityType();
-            }
-        } else {
-            entityType = URLDecoder.decode(entityType, "UTF-8");
-        }
+        
+        entityType = determineEntityType(entityType, cmd);
 
         if (StringUtils.isBlank(entityType)) {
-            List<ClassTree> entityTypes = getAddEntityTypes(cmd.getPolymorphicEntities());
-            model.addAttribute("entityTypes", entityTypes);
-            model.addAttribute("viewType", "modal/entityTypeSelection");
-            model.addAttribute("entityFriendlyName", cmd.getPolymorphicEntities().getFriendlyName());
-            String requestUri = request.getRequestURI();
-            if (!request.getContextPath().equals("/") && requestUri.startsWith(request.getContextPath())) {
-                requestUri = requestUri.substring(request.getContextPath().length() + 1, requestUri.length());
-            }
-            model.addAttribute("currentUri", requestUri);
-            model.addAttribute("modalHeaderType", ModalHeaderType.ADD_ENTITY.getType());
-            setModelAttributes(model, SECTION_KEY);
-            return "modules/modalContainer";
-        } else {
-            ppr = ppr.withCeilingEntityClassname(entityType);
+            return getModalForBlankEntityType(request, model, SECTION_KEY, cmd);
         }
+        
+        ppr = ppr.withCeilingEntityClassname(entityType);
 
         ClassMetadata collectionMetadata = service.getClassMetadata(ppr).getDynamicResultSet().getClassMetaData();
         EntityForm entityForm = formService.createEntityForm(collectionMetadata, sectionCrumbs);
@@ -168,6 +158,7 @@ public class AdminProductController extends AdminBasicEntityController {
         formService.removeNonApplicableFields(collectionMetadata, entityForm, ppr.getCeilingEntityClassname());
 
         entityForm.removeAction(DefaultEntityFormActions.DELETE);
+        entityForm.removeAction(DefaultEntityFormActions.DUPLICATE);
 
         if(StringUtils.isBlank(entityForm.getParentId())) {
             entityForm.setParentId(id);
@@ -180,7 +171,7 @@ public class AdminProductController extends AdminBasicEntityController {
         model.addAttribute("modalHeaderType", ModalHeaderType.ADD_COLLECTION_ITEM.getType());
         model.addAttribute("collectionProperty", collectionProperty);
         setModelAttributes(model, SECTION_KEY);
-        return "modules/modalContainer";
+        return MODAL_CONTAINER_VIEW;
     }
 
     @Override
@@ -219,17 +210,14 @@ public class AdminProductController extends AdminBasicEntityController {
         Entity entity = service.getRecord(ppr, collectionItemId, collectionMetadata, true).getDynamicResultSet().getRecords()[0];
 
         String currentTabName = getCurrentTabName(pathVars, collectionMetadata);
-        Map<String, DynamicResultSet> subRecordsMap = service.getRecordsForSelectedTab(collectionMetadata, entity, sectionCrumbs, currentTabName);
-        if (entityForm == null) {
-            entityForm = formService.createEntityForm(collectionMetadata, entity, subRecordsMap, sectionCrumbs);
-        } else {
-            entityForm.clearFieldsMap();
-            formService.populateEntityForm(collectionMetadata, entity, subRecordsMap, entityForm, sectionCrumbs);
-            //remove all the actions since we're not trying to redisplay them on the form
-            entityForm.removeAllActions();
-        }
+        Map<String, DynamicResultSet> subRecordsMap = service
+                .getRecordsForSelectedTab(collectionMetadata, entity, sectionCrumbs, currentTabName);
+
+        entityForm = reinitializeEntityForm(entityForm, collectionMetadata, entity, subRecordsMap, 
+                sectionCrumbs);
 
         entityForm.removeAction(DefaultEntityFormActions.DELETE);
+        entityForm.removeAction(DefaultEntityFormActions.DUPLICATE);
 
         // Ensure that operations on the Sku subcollections go to the proper URL
         for (ListGrid lg : entityForm.getAllListGrids()) {
@@ -244,7 +232,7 @@ public class AdminProductController extends AdminBasicEntityController {
         model.addAttribute("modalHeaderType", ModalHeaderType.UPDATE_COLLECTION_ITEM.getType());
         model.addAttribute("collectionProperty", collectionProperty);
         setModelAttributes(model, SECTION_KEY);
-        return "modules/modalContainer";
+        return MODAL_CONTAINER_VIEW;
     }
 
     @Override
@@ -367,7 +355,7 @@ public class AdminProductController extends AdminBasicEntityController {
 
         // When we're dealing with product bundles, we don't want to render the product options and additional skus
         // list grids. Remove them from the form.
-        if (ProductBundle.class.isAssignableFrom(Class.forName(form.getEntityType()))) {
+        if (ProductType.class.isAssignableFrom(Class.forName(form.getEntityType()))) {
             form.removeListGrid("additionalSkus");
             form.removeListGrid("productOptions");
             form.removeField("canSellWithoutOptions");
@@ -390,5 +378,34 @@ public class AdminProductController extends AdminBasicEntityController {
                 e.printStackTrace();
             }
         }
+    }
+
+    @Override
+    public String addCollectionItem(HttpServletRequest request, HttpServletResponse response, Model model, @PathVariable Map<String, String> pathVars, @PathVariable("id") String id, @PathVariable("collectionField") String collectionField, @ModelAttribute("entityForm") EntityForm entityForm, BindingResult result) throws Exception {
+        if (PRODUCT_OPTIONS_COLLECTION_FIELD.equals(collectionField)) {
+            boolean isAttributeNameExist = false;
+            String addAttributeName = null;
+            try {
+                final Field productOptionIdField = entityForm.getFields().get(PRODUCT_OPTION_ID_FIELD_KEY);
+                final Field productIdField = entityForm.getFields().get(PRODUCT_ID_FIELD_KEY);
+                final ProductOption addProductOption = catalogService.findProductOptionById(Long.parseLong(productOptionIdField.getValue()));
+                final Product product = catalogService.findProductById(Long.parseLong(productIdField.getValue()));
+                addAttributeName = addProductOption.getAttributeName();
+                isAttributeNameExist = product.getProductOptionXrefs().stream()
+                    .map(ProductOptionXref::getProductOption)
+                    .map(ProductOption::getAttributeName)
+                    .anyMatch(attributeName -> attributeName.equals(addProductOption.getAttributeName()));
+            } catch (Exception e) {
+                LOG.error(e);
+            }
+            if (isAttributeNameExist) {
+                return new JsonResponse(response)
+                    .with("status", "error")
+                    .with("message", String.format("Product Option with attribute name: '%s' is already assigned", addAttributeName))
+                    .done();
+            }
+        }
+
+        return super.addCollectionItem(request, response, model, pathVars, id, collectionField, entityForm, result);
     }
 }

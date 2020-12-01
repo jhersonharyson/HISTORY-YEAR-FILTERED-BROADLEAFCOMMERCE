@@ -25,6 +25,7 @@ import org.broadleafcommerce.common.admin.domain.AdminMainEntity;
 import org.broadleafcommerce.common.exception.ServiceException;
 import org.broadleafcommerce.common.persistence.EntityConfiguration;
 import org.broadleafcommerce.common.presentation.client.AddMethodType;
+import org.broadleafcommerce.common.presentation.client.PersistencePerspectiveItemType;
 import org.broadleafcommerce.common.presentation.client.SupportedFieldType;
 import org.broadleafcommerce.common.util.BLCMessageUtils;
 import org.broadleafcommerce.common.util.BLCSystemProperty;
@@ -44,6 +45,7 @@ import org.broadleafcommerce.openadmin.dto.FilterAndSortCriteria;
 import org.broadleafcommerce.openadmin.dto.GroupMetadata;
 import org.broadleafcommerce.openadmin.dto.MapMetadata;
 import org.broadleafcommerce.openadmin.dto.MapStructure;
+import org.broadleafcommerce.openadmin.dto.ParentRecordStructure;
 import org.broadleafcommerce.openadmin.dto.PersistencePackage;
 import org.broadleafcommerce.openadmin.dto.Property;
 import org.broadleafcommerce.openadmin.dto.SectionCrumb;
@@ -53,6 +55,7 @@ import org.broadleafcommerce.openadmin.server.dao.DynamicEntityDao;
 import org.broadleafcommerce.openadmin.server.domain.FetchPageRequest;
 import org.broadleafcommerce.openadmin.server.domain.PersistencePackageRequest;
 import org.broadleafcommerce.openadmin.server.factory.PersistencePackageFactory;
+import org.broadleafcommerce.openadmin.server.service.extension.CriteriaTransferObjectExtensionManager;
 import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceManagerFactory;
 import org.broadleafcommerce.openadmin.server.service.persistence.PersistenceResponse;
 import org.broadleafcommerce.openadmin.server.service.persistence.module.BasicPersistenceModule;
@@ -95,6 +98,9 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     @Resource(name = "blEntityConfiguration")
     protected EntityConfiguration entityConfiguration;
 
+    @Resource
+    protected CriteriaTransferObjectExtensionManager extensionManager;
+
     protected DynamicDaoHelper dynamicDaoHelper = new DynamicDaoHelperImpl();
 
     @Override
@@ -116,11 +122,11 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     public PersistenceResponse getRecord(PersistencePackageRequest request, String id, ClassMetadata cmd, boolean isCollectionRequest)
             throws ServiceException {
         String idProperty = getIdProperty(cmd);
-        
+
         FilterAndSortCriteria fasc = new FilterAndSortCriteria(idProperty);
         fasc.setFilterValue(id);
         request.addFilterAndSortCriteria(fasc);
-        
+
         PersistenceResponse response = fetch(request);
         Entity[] entities = response.getDynamicResultSet().getRecords();
         if (ArrayUtils.isEmpty(entities)) {
@@ -190,10 +196,10 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         PersistencePackageRequest ppr = getRequestForEntityForm(entityForm, customCriteria, sectionCrumb);
         return remove(ppr);
     }
-    
+
     protected List<Property> getPropertiesFromEntityForm(EntityForm entityForm) {
         List<Property> properties = new ArrayList<Property>(entityForm.getFields().size());
-        
+
         for (Entry<String, Field> entry : entityForm.getFields().entrySet()) {
             Property p = new Property();
             p.setName(entry.getKey());
@@ -202,10 +208,11 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             p.setIsDirty(entry.getValue().getIsDirty());
             properties.add(p);
         }
-        
+
         return properties;
     }
 
+    @Override
     public PersistencePackageRequest getRequestForEntityForm(EntityForm entityForm, String[] customCriteria, List<SectionCrumb> sectionCrumbs) {
         // Ensure the ID property is on the form
         Field idField = entityForm.findField(entityForm.getIdProperty());
@@ -314,7 +321,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     public PersistenceResponse getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
             Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex, List<SectionCrumb> sectionCrumb)
             throws ServiceException {
-        return getRecordsForCollection(containingClassMetadata, containingEntity, collectionProperty, fascs, startIndex, 
+        return getRecordsForCollection(containingClassMetadata, containingEntity, collectionProperty, fascs, startIndex,
                 maxIndex, null, sectionCrumb);
     }
 
@@ -367,7 +374,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
 
         return fetch(ppr);
     }
-    
+
     @Override
     public PersistenceResponse getRecordsForCollection(ClassMetadata containingClassMetadata, Entity containingEntity,
             Property collectionProperty, FilterAndSortCriteria[] fascs, Integer startIndex, Integer maxIndex,
@@ -493,7 +500,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             }
         }
     }
-    
+
     @Override
     public PersistenceResponse addSubCollectionEntity(EntityForm entityForm, ClassMetadata mainMetadata, Property field,
             Entity parentEntity, List<SectionCrumb> sectionCrumbs)
@@ -510,20 +517,20 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         if (md instanceof BasicCollectionMetadata) {
             BasicCollectionMetadata fmd = (BasicCollectionMetadata) md;
             ppr.getEntity().setType(new String[] { entityForm.getEntityType() });
-            
-            // If we're looking up an entity instead of trying to create one on the fly, let's make sure 
+
+            // If we're looking up an entity instead of trying to create one on the fly, let's make sure
             // that we're not changing the target entity at all and only creating the association to the id
-            if (fmd.getAddMethodType().equals(AddMethodType.LOOKUP) || 
+            if (fmd.getAddMethodType().equals(AddMethodType.LOOKUP) ||
                     fmd.getAddMethodType().equals(AddMethodType.LOOKUP_FOR_UPDATE)) {
                 List<String> fieldsToRemove = new ArrayList<String>();
-                
+
                 String idProp = getIdProperty(mainMetadata);
                 for (String key : entityForm.getFields().keySet()) {
                     if (!idProp.equals(key)) {
                         fieldsToRemove.add(key);
                     }
                 }
-                
+
                 for (String key : fieldsToRemove) {
                     ListIterator<Property> li = properties.listIterator();
                     while (li.hasNext()) {
@@ -532,7 +539,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                         }
                     }
                 }
-                
+
                 ppr.setValidateUnsubmittedProperties(false);
             }
 
@@ -546,7 +553,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             properties.add(fp);
         } else if (md instanceof AdornedTargetCollectionMetadata) {
             ppr.getEntity().setType(new String[] { ppr.getAdornedList().getAdornedTargetEntityClassname() });
-            
+
             String[] maintainedFields = ((AdornedTargetCollectionMetadata) md).getMaintainedAdornedTargetFields();
             if (maintainedFields == null || maintainedFields.length == 0) {
                 ppr.setValidateUnsubmittedProperties(false);
@@ -562,7 +569,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             }
         } else if (md instanceof MapMetadata) {
             ppr.getEntity().setType(new String[] { entityForm.getEntityType() });
-            
+
             Property p = new Property();
             p.setName("symbolicId");
             p.setValue(getContextSpecificRelationshipId(mainMetadata, parentEntity, field.getName()));
@@ -578,7 +585,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             sectionField = sectionField.substring(0, sectionField.lastIndexOf("."));
         }
         ppr.setSectionEntityField(sectionField);
-        
+
         Property parentNameProp = parentEntity.getPMap().get(AdminMainEntity.MAIN_ENTITY_NAME_PROPERTY);
         if (parentNameProp != null) {
             ppr.setRequestingEntityName(parentNameProp.getValue());
@@ -645,7 +652,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             }
         } else if (md instanceof MapMetadata) {
             ppr.getEntity().setType(new String[] { entityForm.getEntityType() });
-            
+
             Property p = new Property();
             p.setName("symbolicId");
             p.setValue(getContextSpecificRelationshipId(mainMetadata, parentEntity, field.getName()));
@@ -660,7 +667,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             sectionField = sectionField.substring(0, sectionField.lastIndexOf("."));
         }
         ppr.setSectionEntityField(sectionField);
-        
+
         Property parentNameProp = parentEntity.getPMap().get(AdminMainEntity.MAIN_ENTITY_NAME_PROPERTY);
         if (parentNameProp != null) {
             ppr.setRequestingEntityName(parentNameProp.getValue());
@@ -754,9 +761,9 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             p.setName("priorKey");
             p.setValue(priorKey);
             properties.add(p);
-            
+
             MapStructure mapStructure = ppr.getMapStructure();
-            
+
             p = new Property();
             p.setName(mapStructure.getKeyPropertyName());
             p.setValue(itemId);
@@ -771,7 +778,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             sectionField = sectionField.substring(0, sectionField.lastIndexOf("."));
         }
         ppr.setSectionEntityField(sectionField);
-        
+
         Property parentNameProp = parentEntity.getPMap().get(AdminMainEntity.MAIN_ENTITY_NAME_PROPERTY);
         if (parentNameProp != null) {
             ppr.setRequestingEntityName(parentNameProp.getValue());
@@ -792,7 +799,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         } else {
             prefix = "";
         }
-                
+
         if (prefix.equals("")) {
             return entity.findProperty("id").getValue();
         } else {
@@ -809,13 +816,14 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                     }
                 }
                 String tempPrefix = sb.toString();
-                
+
                 for (Property property : entity.getProperties()) {
                     if (property.getName().startsWith(tempPrefix)) {
                         //make sure there is only one '.' to ensure we are looking at properties on the current prefix level
                         //in the case of the prefix defaultSku, we want defaultSku.id not defaultSku.skuAttributes.id
                         if (StringUtils.countMatches(property.getName().replace(tempPrefix, ""), ".") == 1) {
-                            if (cmd.getPMap().containsKey(property.getName())) {
+                            if (cmd.getPMap().containsKey(property.getName()) &&
+                                    (cmd.getPMap().get(property.getName()).getMetadata() instanceof BasicFieldMetadata)) {
                                 BasicFieldMetadata md = (BasicFieldMetadata) cmd.getPMap().get(property.getName()).getMetadata();
                                 if (md.getFieldType().equals(SupportedFieldType.ID)) {
                                     return property.getValue();
@@ -832,7 +840,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         }
         throw new RuntimeException("Unable to establish a relationship id");
     }
-    
+
     @Override
     public String getIdProperty(ClassMetadata cmd) throws ServiceException {
         for (Property p : cmd.getProperties()) {
@@ -844,7 +852,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
                 }
             }
         }
-        
+
         throw new ServiceException("Could not determine ID field for " + cmd.getCeilingType());
     }
 
@@ -852,7 +860,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     public PersistenceResponse add(PersistencePackageRequest request) throws ServiceException {
         return add(request, true);
     }
-    
+
     @Override
     public PersistenceResponse add(PersistencePackageRequest request, boolean transactional) throws ServiceException {
         PersistencePackage pkg = persistencePackageFactory.create(request);
@@ -881,12 +889,12 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             return new PersistenceResponse().withEntity(e.getEntity());
         }
     }
-    
+
     @Override
     public PersistenceResponse update(PersistencePackageRequest request) throws ServiceException {
         return update(request, true);
     }
-    
+
     @Override
     public PersistenceResponse update(PersistencePackageRequest request, boolean transactional) throws ServiceException {
         PersistencePackage pkg = persistencePackageFactory.create(request);
@@ -929,12 +937,12 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             return new PersistenceResponse().withEntity(e.getEntity());
         }
     }
-    
+
     /**
      * <p>
      * Should be invoked when a {@link ValidationException} is thrown to verify that the {@link Entity} contained within the
      * given <b>originalRequest</b> has a validationFailure = true
-     * 
+     *
      * <p>
      * This will also check for a cause of {@link ConstraintViolationException} and add a gloal error to that.
      */
@@ -966,7 +974,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         } else {
             cto.setFirstResult(request.getStartIndex());
         }
-        
+
         if (request.getMaxIndex() != null) {
             Integer startIndex = request.getStartIndex() != null ? request.getStartIndex() : 0;
             int requestedMaxResults = request.getMaxIndex() - startIndex + 1;
@@ -983,16 +991,25 @@ public class AdminEntityServiceImpl implements AdminEntityService {
             cto.setMaxResults(request.getPageSize());
         }
         cto.setPresentationFetch(request.getPresentationFetch());
+
+        if (request.isFolderedLookup()) {
+            cto.setFolderLookup(true);
+            cto.setFolderId(request.getFolderId());
+        }
+
+        if (extensionManager != null) {
+            extensionManager.getProxy().modifyFetchCriteriaTransferObject(request, cto);
+        }
         
         return service.fetch(pkg, cto);
     }
-    
+
     protected CriteriaTransferObject getDefaultCto() {
         CriteriaTransferObject cto = new CriteriaTransferObject();
         cto.setMaxResults(getDefaultMaxResults());
         return cto;
     }
-    
+
     @Override
     public String getForeignEntityName(String owningClass, String id) {
         if (owningClass == null || id == null) {
@@ -1006,7 +1023,7 @@ public class AdminEntityServiceImpl implements AdminEntityService {
         if (foreignEntity instanceof AdminMainEntity) {
             return ((AdminMainEntity) foreignEntity).getMainEntityName();
         }
-        
+
         return null;
     }
 
@@ -1019,12 +1036,22 @@ public class AdminEntityServiceImpl implements AdminEntityService {
     }
 
     protected Object toIdFieldType(String id, Class<?> entityClass) {
-        Class<?> idFieldClass = dynamicDaoHelper.getIdField(entityClass, em).getType();
+        Class<?> idFieldClass = dynamicDaoHelper.getIdField(entityClass).getType();
         if (Long.class.isAssignableFrom(idFieldClass)) {
             return Long.parseLong(id);
         } else if (Integer.class.isAssignableFrom(idFieldClass)) {
             return Integer.parseInt(id);
         }
         return id;
+    }
+
+    @Override
+    public void clearEntityManager(){
+        em.clear();
+    }
+
+    public void populateParentRecordStructure(PersistencePackage persistencePackage, Entity entity, ClassMetadata parentMetadata){
+        persistencePackage.getPersistencePerspective().addPersistencePerspectiveItem(PersistencePerspectiveItemType.PARENTRECORDSTRUCTURE,
+                                                                                        new ParentRecordStructure(entity, parentMetadata));
     }
 }

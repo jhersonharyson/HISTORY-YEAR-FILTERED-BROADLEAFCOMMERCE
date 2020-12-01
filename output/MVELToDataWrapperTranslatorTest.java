@@ -287,7 +287,7 @@ public class MVELToDataWrapperTranslatorTest extends TestCase {
         assert(e2.getValue().equals("[99,199]"));
     }
 
-    public void testNestedExpressionExceptionForFulfillmentGroupQualificationDataWrapper() throws MVELTranslationException {
+    public void testNestedExpressionForFulfillmentGroupQualificationDataWrapper() throws MVELTranslationException {
         MVELToDataWrapperTranslator translator = new MVELToDataWrapperTranslator();
 
         Property[] properties = new Property[1];
@@ -301,7 +301,22 @@ public class MVELToDataWrapperTranslatorTest extends TestCase {
         entities[0] = entity;
 
         DataWrapper dataWrapper = translator.createRuleData(entities, "matchRule", null, null, fulfillmentGroupFieldService);
-        assert(dataWrapper.getError().equals(MVELToDataWrapperTranslator.SUB_GROUP_MESSAGE));
+        assert(dataWrapper.getData().size() == 1);
+        assert(dataWrapper.getData().get(0).getQuantity() == null);
+        assert(dataWrapper.getData().get(0).getCondition().equals(BLCOperator.AND.name()));
+        assert(dataWrapper.getData().get(0).getRules().size()==2);
+
+        assert(dataWrapper.getData().get(0).getRules().get(0) instanceof ExpressionDTO);
+        ExpressionDTO e1 = (ExpressionDTO) dataWrapper.getData().get(0).getRules().get(0);
+        assert(e1.getId().equals("address.state.name"));
+        assert(e1.getOperator().equals(BLCOperator.EQUALS.name()));
+        assert(e1.getValue().equals("Texas"));
+
+        assert(dataWrapper.getData().get(0).getRules().get(1) instanceof ExpressionDTO);
+        ExpressionDTO e2 = (ExpressionDTO) dataWrapper.getData().get(0).getRules().get(1);
+        assert(e2.getId().equals("retailFulfillmentPrice"));
+        assert(e2.getOperator().equals(BLCOperator.BETWEEN_INCLUSIVE.name()));
+        assert(e2.getValue().equals("[99,199]"));
     }
 
     public void testItemQualificationCollectionDataWrapper() throws MVELTranslationException {
@@ -412,7 +427,7 @@ public class MVELToDataWrapperTranslatorTest extends TestCase {
         entities[1] = e2;
 
         DataWrapper dataWrapper = translator.createRuleData(entities, "orderItemMatchRule", "quantity", "id", orderItemFieldService);
-        assert(dataWrapper.getError().equals(MVELToDataWrapperTranslator.SUB_GROUP_MESSAGE));
+        assert(MVELToDataWrapperTranslator.SUB_GROUP_MESSAGE.equals(dataWrapper.getError()));
 
     }
 
@@ -460,6 +475,89 @@ public class MVELToDataWrapperTranslatorTest extends TestCase {
     }
 
     public void testInBetweenRuleOrderLessThenAndGreaterThenAndCurrency() throws MVELTranslationException {
+        MVELToDataWrapperTranslator translator = new MVELToDataWrapperTranslator();
+
+        Property[] p1 = new Property[1];
+        Property m1 = new Property();
+        m1.setName("matchRule");
+        m1.setValue("(MvelHelper.convertField(\"DATE\",customer.?getCustomerAttributes()[\"invoice_date\"])>MvelHelper" +
+                ".convertField(\"DATE\",\"2017.10.14 16:38:00 -0500\")&&MvelHelper.convertField(\"DATE\",customer" +
+                ".?getCustomerAttributes()[\"invoice_date\"])<MvelHelper.convertField(\"DATE\"," +
+                "\"2017.10.16 16:38:00 -0500\"))&&(MvelHelper.convertField(\"DATE\",customer.?getCustomerAttributes()" +
+                "[\"invoice_date\"])>=MvelHelper.convertField(\"DATE\",\"2017.10.24 16:39:00 -0500\")&&MvelHelper" +
+                ".convertField(\"DATE\",customer.?getCustomerAttributes()[\"invoice_date\"])<=MvelHelper" +
+                ".convertField(\"DATE\",\"2017.10.25 16:40:00 -0500\"))");
+        Property q1 = new Property();
+        q1.setName("quantity");
+        q1.setValue("1");
+        Property i1 = new Property();
+        i1.setName("id");
+        i1.setValue("100");
+        p1[0] = m1;
+
+        Entity e1 = new Entity();
+        e1.setProperties(p1);
+
+        Entity[] entities = new Entity[1];
+        entities[0] = e1;
+
+        customerFieldService.getFields().add(new FieldData.Builder()
+                .label("Customer - invoice date")
+                .name("getCustomerAttributes()---invoice_date")
+                .operators(RuleOperatorType.DATE)
+                .options(RuleOptionType.EMPTY_COLLECTION)
+                .type(SupportedFieldType.DATE)
+                .build());
+
+        DataWrapper dataWrapper = translator.createRuleData(entities, "matchRule", null, null, customerFieldService);
+
+        customerFieldService.init();
+
+        assert(dataWrapper.getData().get(0).getRules().size() == 2);
+
+    }
+
+    public void testWithinDaysDataWrapper() throws MVELTranslationException {
+        MVELToDataWrapperTranslator translator = new MVELToDataWrapperTranslator();
+
+        Property[] p1 = new Property[1];
+        Property m1 = new Property();
+        m1.setName("matchRule");
+        m1.setValue("(MvelHelper.convertField(\"DATE\",customer.?getCustomerAttributes()[\"invoice_date\"])" +
+                ">MvelHelper.convertField(\"DATE\",MvelHelper.subtractFromCurrentTime(10))" +
+                "&&MvelHelper.convertField(\"DATE\",customer.?getCustomerAttributes()[\"invoice_date\"])" +
+                "<MvelHelper.convertField(\"DATE\",MvelHelper.currentTime()))");
+        Property q1 = new Property();
+        q1.setName("quantity");
+        q1.setValue("1");
+        Property i1 = new Property();
+        i1.setName("id");
+        i1.setValue("100");
+        p1[0] = m1;
+
+        Entity e1 = new Entity();
+        e1.setProperties(p1);
+
+        Entity[] entities = new Entity[1];
+        entities[0] = e1;
+
+        customerFieldService.getFields().add(new FieldData.Builder()
+                .label("Customer - invoice date")
+                .name("getCustomerAttributes()---invoice_date")
+                .operators(RuleOperatorType.DATE)
+                .options(RuleOptionType.EMPTY_COLLECTION)
+                .type(SupportedFieldType.DATE)
+                .build());
+
+        DataWrapper dataWrapper = translator.createRuleData(entities, "matchRule", null, null, customerFieldService);
+
+        customerFieldService.init();
+
+        assert(dataWrapper.getData().get(0).getRules().get(0).getRules().size() == 2);
+
+    }
+
+    public void testInBetweenRuleCurrentlyWorks() throws MVELTranslationException {
         MVELToDataWrapperTranslator translator = new MVELToDataWrapperTranslator();
 
         Property[] properties = new Property[3];
@@ -521,6 +619,70 @@ public class MVELToDataWrapperTranslatorTest extends TestCase {
         assert(exp.getId().equals("subTotal"));
         assert(exp.getOperator().equals(BLCOperator.BETWEEN.name()));
         assert(exp.getValue().equals("[45,75]"));
+    }
+
+    public void testInBetweenRuleOrderItemPrice() throws MVELTranslationException {
+        MVELToDataWrapperTranslator translator = new MVELToDataWrapperTranslator();
+
+        Property[] properties = new Property[3];
+        Property mvelProperty = new Property();
+        mvelProperty.setName("matchRule");
+        mvelProperty.setValue("(orderItem.?price.getAmount()>2&&orderItem.?price.getAmount()<4)");
+        Property quantityProperty = new Property();
+        quantityProperty.setName("quantity");
+        quantityProperty.setValue("1");
+        Property idProperty = new Property();
+        idProperty.setName("id");
+        idProperty.setValue("100");
+        properties[0] = mvelProperty;
+        properties[1] = quantityProperty;
+        properties[2] = idProperty;
+        Entity[] entities = new Entity[1];
+        Entity entity = new Entity();
+        entity.setProperties(properties);
+        entities[0] = entity;
+
+        DataWrapper dataWrapper = translator.createRuleData(entities, "matchRule", "quantity", "id", orderItemFieldService);
+        assert (dataWrapper.getData().size() == 1);
+        assert (dataWrapper.getData().get(0).getQuantity() == 1);
+        assert (dataWrapper.getData().get(0).getRules().size() == 1);
+        assert (dataWrapper.getData().get(0).getRules().get(0) instanceof ExpressionDTO);
+        ExpressionDTO exp = (ExpressionDTO) dataWrapper.getData().get(0).getRules().get(0);
+        assert (exp.getId().equals("price"));
+        assert (exp.getOperator().equals(BLCOperator.BETWEEN.name()));
+        assert (exp.getValue().equals("[2,4]"));
+    }
+
+    public void testInBetweenInclusiveRuleOrderItemPrice() throws MVELTranslationException {
+        MVELToDataWrapperTranslator translator = new MVELToDataWrapperTranslator();
+
+        Property[] properties = new Property[3];
+        Property mvelProperty = new Property();
+        mvelProperty.setName("matchRule");
+        mvelProperty.setValue("(orderItem.?price.getAmount()>=2&&orderItem.?price.getAmount()<=4)");
+        Property quantityProperty = new Property();
+        quantityProperty.setName("quantity");
+        quantityProperty.setValue("1");
+        Property idProperty = new Property();
+        idProperty.setName("id");
+        idProperty.setValue("100");
+        properties[0] = mvelProperty;
+        properties[1] = quantityProperty;
+        properties[2] = idProperty;
+        Entity[] entities = new Entity[1];
+        Entity entity = new Entity();
+        entity.setProperties(properties);
+        entities[0] = entity;
+
+        DataWrapper dataWrapper = translator.createRuleData(entities, "matchRule", "quantity", "id", orderItemFieldService);
+        assert (dataWrapper.getData().size() == 1);
+        assert (dataWrapper.getData().get(0).getQuantity() == 1);
+        assert (dataWrapper.getData().get(0).getRules().size() == 1);
+        assert (dataWrapper.getData().get(0).getRules().get(0) instanceof ExpressionDTO);
+        ExpressionDTO exp = (ExpressionDTO) dataWrapper.getData().get(0).getRules().get(0);
+        assert (exp.getId().equals("price"));
+        assert (exp.getOperator().equals(BLCOperator.BETWEEN_INCLUSIVE.name()));
+        assert (exp.getValue().equals("[2,4]"));
     }
 
 }

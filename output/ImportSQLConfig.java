@@ -37,17 +37,16 @@ public class ImportSQLConfig {
     public static final int BASIC_DATA_SPECIAL = AutoImportStage.PRIMARY_PRE_BASIC_DATA + 200;
 
     @Bean
+    public AutoImportSql blLocaleData() {
+        return new AutoImportSql(AutoImportPersistenceUnit.BL_PU,"config/bc/sql/demo/load_locale.sql", BASIC_DATA_SPECIAL);
+    }
+
+    @Bean
     @Conditional(DemoCondition.class)
     public AutoImportSql blCMSBasicData() {
         return new AutoImportSql(AutoImportPersistenceUnit.BL_PU,"config/bc/sql/demo/load_content_structure.sql," +
                 "config/bc/sql/demo/load_content_data.sql,config/bc/sql/demo/load_content_structure_i18n.sql," +
                 "config/bc/sql/demo/load_content_data_i18n.sql", BASIC_DATA_SPECIAL);
-    }
-
-    @Bean
-    @Conditional(DemoCondition.class)
-    public AutoImportSql blCMSSequenceData() {
-        return new AutoImportSql(AutoImportPersistenceUnit.ALL,"config/bc/sql/demo/load_cms_table_sequences.sql", AutoImportStage.ALL_TABLE_SEQUENCE);
     }
 
     @Bean
